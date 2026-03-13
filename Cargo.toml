@@ -1,0 +1,9 @@
+[package]
+name = "bit_slam_nodes"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+r2r = "0.9.5"
+arg_vals = {git = "https://github.com/gjf2a/arg_vals"}
+particle_filter = {git = "https://github.com/gjf2a/particle_filter"}
