@@ -12,3 +12,4 @@ crossbeam = "0.8.4"
 ctrlc = "3.4"
 arg_vals = {git = "https://github.com/gjf2a/arg_vals"}
 particle_filter = {git = "https://github.com/gjf2a/particle_filter"}
+particle_filter_create3 = {git = "https://github.com/gjf2a/particle_filter_create3"}
