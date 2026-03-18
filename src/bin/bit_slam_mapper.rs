@@ -24,6 +24,5 @@ fn main() {
             settings.square_size_m = meters_per_cell;
         }
         let period = args.get_value("-spin_time").unwrap_or(0.1);
-        
     }
 }
