@@ -26,5 +26,6 @@ fn main() -> anyhow::Result<()> {
             }
         }
     })?;
+    spec.run()?;
     Ok(())
 }
