@@ -1,16 +1,12 @@
-use crate::{NodeHandler, NodeSpec};
-use r2r::{Node, QosProfile, irobot_create_msgs::msg::HazardDetectionVector};
+use r2r::{Node, QosProfile, irobot_create_msgs::msg::HazardDetectionVector, std_msgs::msg::String as Ros2String};
 
-pub struct Create3BumperHandlers {
+use crate::ros2_node;
 
-}
-
-impl NodeHandler for Create3BumperHandlers {
-    fn run(&self) -> impl Future<Output = ()> + Send + 'static {
-        async {
-            todo!();
-        }
-    }
+fn run_create3_bumper(robot_name: &str) -> anyhow::Result<()> {
+    ros2_node!(robot_name, 100, 
+        publisher outgoing; Ros2String; "outgoing",
+    );
+    Ok(())
 }
 
 pub struct Create3BumperSpec {
