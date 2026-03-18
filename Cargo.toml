@@ -5,5 +5,10 @@ edition = "2024"
 
 [dependencies]
 r2r = "0.9.5"
+smol = "2.0.2"
+futures = "0.3.32"
+anyhow = "1.0.32"
+crossbeam = "0.8.4"
+ctrlc = "3.4"
 arg_vals = {git = "https://github.com/gjf2a/arg_vals"}
 particle_filter = {git = "https://github.com/gjf2a/particle_filter"}

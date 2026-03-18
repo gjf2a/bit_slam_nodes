@@ -1,6 +1,14 @@
 use arg_vals::ArgVals;
 use particle_filter::ParticleFilterSettings;
 
+// What do we need?
+// Subscriber to hazards
+// - might not be the iRobot topic
+// - might need another node that encodes obstacles
+// Subscriber to odometry
+// Publisher of map
+// Publisher of estimated pose
+
 fn main() {
     let args = ArgVals::default();
     if args.len() < 1 {
