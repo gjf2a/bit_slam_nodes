@@ -12,7 +12,8 @@ fn main() -> anyhow::Result<()> {
     };
     let hazard_topic = format!("{robot_name}/hazard_detection");
     let mut spec = NodeSpec::new("BumpObstacle", 100)?;
-    let publisher = spec.publisher::<Ros2String>("obstacles")?;
+    let publish_topic = format!("{robot_name}_obstacles");
+    let publisher = spec.publisher::<Ros2String>(&publish_topic)?;
     spec.subscribe(&hazard_topic, move |hazards: HazardDetectionVector| {
         for detection in hazards.detections {
             let name = detection.header.frame_id;
