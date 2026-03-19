@@ -3,9 +3,7 @@ use futures::StreamExt;
 use smol::lock::Mutex;
 use std::{pin::Pin, sync::Arc};
 
-use r2r::{
-    Context, Node, Publisher, QosProfile, WrappedTypesupport,
-};
+use r2r::{Context, Node, Publisher, QosProfile, WrappedTypesupport};
 
 pub struct NodeSpec {
     node: Arc<Mutex<Node>>,
