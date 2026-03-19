@@ -15,6 +15,7 @@ fn main() -> anyhow::Result<()> {
     let publish_topic = format!("{robot_name}_obstacles");
     let publisher = spec.publisher::<Ros2String>(&publish_topic)?;
     spec.subscribe(&hazard_topic, move |hazards: HazardDetectionVector| {
+        println!("received {hazards:?}");
         for detection in hazards.detections {
             let name = detection.header.frame_id;
             if let Ok(bump) = name.parse::<Bump>() {
