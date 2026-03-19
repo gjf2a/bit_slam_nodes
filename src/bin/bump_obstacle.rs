@@ -14,11 +14,14 @@ fn main() -> anyhow::Result<()> {
     let mut spec = NodeSpec::new("BumpObstacle", 100)?;
     let publish_topic = format!("{robot_name}_obstacles");
     let publisher = spec.publisher::<Ros2String>(&publish_topic)?;
+    println!("Publishing on {publish_topic}");
     spec.subscribe(&hazard_topic, move |hazards: HazardDetectionVector| {
         println!("received {hazards:?}");
         for detection in hazards.detections {
-            let name = detection.header.frame_id;
+            let name = detection.header.frame_id.as_str();
+            println!("detection: {:?} header frame: {name:?}", &detection);
             if let Ok(bump) = name.parse::<Bump>() {
+                println!("bump: {bump:?}");
                 let obstacle = bump.obstacle_at();
                 let msg = Ros2String {data: format!("{obstacle:?}")};
                 if let Err(e) = publisher.publish(&msg) {
