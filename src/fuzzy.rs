@@ -134,7 +134,7 @@ mod tests {
     }
 
     #[test]
-    fn test_fuzzify_rising() {
+    fn test_fuzzify_rising_falling() {
         for (expected, height) in [
             (1.0, 76),
             (0.75, 74),
@@ -146,6 +146,8 @@ mod tests {
         ] {
             let f = FuzzySet::Rising(68.0, 76.0).fuzzify(height as f64).unwrap();
             assert_eq!(fz!(expected), f);
+            let g = FuzzySet::Falling(68.0, 76.0).fuzzify(height as f64).unwrap();
+            assert_eq!(fz!(expected), !g);
         }
     }
 
