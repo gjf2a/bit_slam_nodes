@@ -1,3 +1,4 @@
+pub mod fuzzy;
 pub mod nodes;
 pub mod util;
 
