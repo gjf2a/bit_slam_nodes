@@ -3,6 +3,8 @@ use std::{
     ops::{BitAnd, BitOr, Not},
 };
 
+use serde::{Deserialize, Serialize};
+
 pub enum FuzzySet {
     Rising(f64, f64),
     Falling(f64, f64),
@@ -33,20 +35,20 @@ fn descend(start: f64, value: f64, end: f64) -> f64 {
 }
 
 impl FuzzySet {
-    pub fn fuzzify(&self, value: f64) -> anyhow::Result<FuzzyVar> {
+    pub fn fuzzify(&self, value: f64) -> FuzzyVar {
         let result = match self {
             FuzzySet::Rising(start, end) => {
                 if *start < *end {
                     ascend(*start, value, *end)
                 } else {
-                    anyhow::bail!("{start} is not less than {end}")
+                    panic!("{start} is not less than {end}")
                 }
             }
             FuzzySet::Falling(start, end) => {
                 if *start < *end {
                     descend(*start, value, *end)
                 } else {
-                    anyhow::bail!("{start} is not less than {end}")
+                    panic!("{start} is not less than {end}")
                 }
             }
             FuzzySet::Triangle(start, peak, end) => {
@@ -57,7 +59,7 @@ impl FuzzySet {
                         descend(*peak, value, *end)
                     }
                 } else {
-                    anyhow::bail!("{start}, {peak}, and {end} are not ascending")
+                    panic!("{start}, {peak}, and {end} are not ascending")
                 }
             }
             FuzzySet::Trapezoid(start, peak_start, peak_end, end) => {
@@ -70,15 +72,15 @@ impl FuzzySet {
                         descend(*peak_end, value, *end)
                     }
                 } else {
-                    anyhow::bail!("{start}, {peak_start}, {peak_end}, and {end} are not ascending")
+                    panic!("{start}, {peak_start}, {peak_end}, and {end} are not ascending")
                 }
             }
         };
-        Ok(FuzzyVar::new(result))
+        FuzzyVar::new(result)
     }
 }
 
-#[derive(Copy, Clone, PartialEq, PartialOrd, Debug)]
+#[derive(Copy, Clone, PartialEq, PartialOrd, Debug, Serialize, Deserialize)]
 pub struct FuzzyVar(f64);
 
 impl FuzzyVar {
@@ -144,9 +146,9 @@ mod tests {
             (1.0, 80),
             (0.0, 62),
         ] {
-            let f = FuzzySet::Rising(68.0, 76.0).fuzzify(height as f64).unwrap();
+            let f = FuzzySet::Rising(68.0, 76.0).fuzzify(height as f64);
             assert_eq!(fz!(expected), f);
-            let g = FuzzySet::Falling(68.0, 76.0).fuzzify(height as f64).unwrap();
+            let g = FuzzySet::Falling(68.0, 76.0).fuzzify(height as f64);
             assert_eq!(fz!(expected), !g);
         }
     }

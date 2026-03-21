@@ -201,7 +201,7 @@ dependencies = [
 [[package]]
 name = "arg_vals"
 version = "0.1.0"
-source = "git+https://github.com/gjf2a/arg_vals#8cf91165e5f881a72e6b060dc7e348078d355e08"
+source = "git+https://github.com/gjf2a/arg_vals#c85bce466928e391f9f5ffdfc6f9b4c5788d7f57"
 
 [[package]]
 name = "arrayref"
@@ -507,6 +507,7 @@ dependencies = [
  "particle_filter",
  "particle_filter_create3",
  "r2r",
+ "serde",
  "serde_json",
  "smol",
 ]
@@ -1939,9 +1940,9 @@ dependencies = [
 
 [[package]]
 name = "itoa"
-version = "1.0.17"
+version = "1.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92ecc6618181def0457392ccd0ee51198e065e016d1d527a7ac1b6dc7c1f09d2"
+checksum = "8f42a60cbdf9a97f5d2305f08a87dc4e09308d1276d28c869c684d7777685682"
 
 [[package]]
 name = "jni"

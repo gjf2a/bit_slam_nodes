@@ -1,6 +1,5 @@
 use crate::{
-    NodeSpec,
-    util::{parse_obstacle_distance_heading, pose_from_odometry},
+    NodeSpec, PERIOD, util::{parse_obstacle_distance_heading, pose_from_odometry}
 };
 use arg_vals::ArgVals;
 use particle_filter::{ParticleFilter, ParticleFilterSettings};
@@ -15,7 +14,7 @@ use std::sync::Arc;
 pub fn bump_obstacle_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     let robot_name = args.get_symbol(0);
     let hazard_topic = format!("{robot_name}/hazard_detection");
-    let mut spec = NodeSpec::new(format!("{robot_name}_obstacle_node").as_str(), 100)?;
+    let mut spec = NodeSpec::new(format!("{robot_name}_obstacle_node").as_str(), PERIOD)?;
     let publish_topic = obstacle_topic_name(robot_name);
     let publisher = spec.publisher::<Ros2String>(&publish_topic)?;
     println!("Publishing on {publish_topic}");
@@ -53,7 +52,7 @@ pub fn bit_slam_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
 
 pub fn bit_slam_explorer_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     let robot_name = args.get_symbol(0);
-    let mut spec = NodeSpec::new(&format!("{robot_name}_explorer"), 100)?;
+    let mut spec = NodeSpec::new(&format!("{robot_name}_explorer"), PERIOD)?;
 
     Ok(spec)
 }
@@ -114,7 +113,7 @@ impl BitSlamSetup {
             obstacle_topic: obstacle_topic_name(&robot_name),
             odom_topic: format!("{robot_name}/odom"),
             particle_filter: Arc::new(Mutex::new(ParticleFilter::new(settings))),
-            period: args.get_value("-spin_time").unwrap_or(100),
+            period: args.get_value("-spin_time").unwrap_or(PERIOD),
         }
     }
 

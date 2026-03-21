@@ -1,6 +1,9 @@
-pub mod fuzzy;
 pub mod nodes;
+pub mod fuzzy;
+pub mod fuzzy_nodes;
 pub mod util;
+
+const PERIOD: u64 = 100;
 
 use crossbeam::atomic::AtomicCell;
 use futures::StreamExt;

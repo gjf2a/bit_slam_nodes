@@ -6,6 +6,10 @@ pub fn parse_obstacle_distance_heading(msg: &str) -> anyhow::Result<(f64, Radian
     Ok((fp[0], Radians::new(fp[1])))
 }
 
+pub fn find_yaw(value: &Odometry) -> Radians {
+    find_roll_pitch_yaw(value).2
+}
+
 pub fn find_roll_pitch_yaw(value: &Odometry) -> (Radians, Radians, Radians) {
     let (q1, q2, q3, q0) = (
         value.pose.pose.orientation.x,
@@ -29,7 +33,7 @@ pub fn pose_from_odometry(value: &Odometry) -> RobotPose<Radians> {
     let mut result = RobotPose::default();
     result.pos[0] = value.pose.pose.position.x;
     result.pos[1] = value.pose.pose.position.y;
-    let (_, _, theta) = find_roll_pitch_yaw(value);
+    let theta = find_yaw(value);
     result.theta = theta;
     result
 }
