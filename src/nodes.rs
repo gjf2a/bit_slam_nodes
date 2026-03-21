@@ -46,9 +46,11 @@ fn publish_obstacle_location(
 pub fn bit_slam_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     let setup = BitSlamSetup::new(args);
     let mut spec = NodeSpec::new(&setup.node_name, setup.period)?;
-    let publisher = Arc::new(Mutex::new(spec.publisher::<Ros2String>(&setup.map_topic)?));
-    setup.subscribe_obstacle(&mut spec, publisher.clone())?;
-    setup.subscribe_odometry(&mut spec, publisher.clone())?;
+    let particle_filter = setup.create_particle_filter();
+    let publisher = spec.publisher::<Ros2String>(&setup.map_topic)?;
+    let particle_data = Arc::new(Mutex::new(ParticleData {particle_filter, publisher}));
+    setup.subscribe_obstacle(&mut spec, particle_data.clone())?;
+    setup.subscribe_odometry(&mut spec, particle_data.clone())?;
     Ok(spec)
 }
 
@@ -67,12 +69,17 @@ pub fn map_topic_name(robot_name: &str) -> String {
     format!("{robot_name}_maps")
 }
 
+struct ParticleData {
+    particle_filter: ParticleFilter,
+    publisher: Publisher<Ros2String>,
+}
+
 struct BitSlamSetup {
     node_name: String,
     map_topic: String,
     obstacle_topic: String,
     odom_topic: String,
-    particle_filter: Arc<Mutex<ParticleFilter>>,
+    settings: ParticleFilterSettings,
     period: u64,
 }
 
@@ -91,21 +98,23 @@ impl BitSlamSetup {
             map_topic: map_topic_name(&robot_name),
             obstacle_topic: obstacle_topic_name(&robot_name),
             odom_topic: format!("{robot_name}/odom"),
-            particle_filter: Arc::new(Mutex::new(ParticleFilter::new(settings))),
+            settings,
             period: args.get_value("-spin_time").unwrap_or(PERIOD),
         }
+    }
+
+    fn create_particle_filter(&self) -> ParticleFilter {
+        ParticleFilter::new(self.settings.clone())
     }
 
     fn subscribe_obstacle(
         &self,
         spec: &mut NodeSpec,
-        publisher: Arc<Mutex<Publisher<Ros2String>>>,
+        particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
-        let particle_filter = self.particle_filter.clone();
         spec.subscribe(&self.obstacle_topic, move |obst: Ros2String| {
-            let publisher = smol::block_on(publisher.lock());
-            let mut particle_filter = smol::block_on(particle_filter.lock());
-            if let Err(e) = publish_particle_obstacle(&obst, &publisher, &mut particle_filter) {
+            let mut particle_data = smol::block_on(particle_data.lock());
+            if let Err(e) = publish_particle_obstacle(&obst, &mut particle_data) {
                 eprintln!("Error {e} when updating particle filter with {}", obst.data);
             }
         })
@@ -114,13 +123,11 @@ impl BitSlamSetup {
     fn subscribe_odometry(
         &self,
         spec: &mut NodeSpec,
-        publisher: Arc<Mutex<Publisher<Ros2String>>>,
+        particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
-        let particle_filter = self.particle_filter.clone();
         spec.subscribe(&self.odom_topic, move |odom: Odometry| {
-            let publisher = smol::block_on(publisher.lock());
-            let mut particle_filter = smol::block_on(particle_filter.lock());
-            if let Err(e) = publish_particle_odom(&odom, &publisher, &mut particle_filter) {
+            let mut particle_data = smol::block_on(particle_data.lock());
+            if let Err(e) = publish_particle_odom(&odom, &mut particle_data) {
                 eprintln!("Error {e} when updating particle filter with {odom:?}");
             }
         })
@@ -129,37 +136,31 @@ impl BitSlamSetup {
 
 fn publish_particle_obstacle(
     obst: &Ros2String,
-    publisher: &Publisher<Ros2String>,
-    particle_filter: &mut ParticleFilter,
+    particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
     let obstacle = parse_obstacle_distance_heading(&obst.data)?;
-    particle_filter.iterate(None, Some(obstacle));
-    publish_particle(publisher, particle_filter)?;
+    particle_data.particle_filter.iterate(None, Some(obstacle));
+    publish_particle(particle_data)?;
     Ok(())
 }
 
 fn publish_particle_odom(
-    odom: &Odometry,
-    publisher: &Publisher<Ros2String>,
-    particle_filter: &mut ParticleFilter,
+    odom: &Odometry, particle_data: &mut ParticleData
 ) -> anyhow::Result<()> {
     let pose = pose_from_odometry(&odom);
-    particle_filter.iterate(Some(pose), None);
-    publish_particle(publisher, &particle_filter)?;
+    particle_data.particle_filter.iterate(Some(pose), None);
+    publish_particle(particle_data)?;
     Ok(())
 }
 
-fn publish_particle(
-    publisher: &Publisher<Ros2String>,
-    particle_filter: &ParticleFilter,
-) -> anyhow::Result<()> {
-    let failure = particle_filter.example_failure();
+fn publish_particle(particle_data: &ParticleData) -> anyhow::Result<()> {
+    let failure = particle_data.particle_filter.example_failure();
     let particle = match failure.as_ref() {
-        None => particle_filter.particles().next().unwrap(),
+        None => particle_data.particle_filter.particles().next().unwrap(),
         Some(failure) => failure,
     };
     let data = serde_json::to_string(particle)?;
     let msg = Ros2String { data };
-    publisher.publish(&msg)?;
+    particle_data.publisher.publish(&msg)?;
     Ok(())
 }
