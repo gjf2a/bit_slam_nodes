@@ -53,7 +53,7 @@ pub fn bit_slam_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
 
 pub fn bit_slam_explorer_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     let robot_name = args.get_symbol(0);
-    let mut spec = NodeSpec::new(&format!("{robot_name}_explorer"), PERIOD)?;
+    let mut spec = NodeSpec::new(&format!("{robot_name}_explorer_node"), PERIOD)?;
 
     Ok(spec)
 }
