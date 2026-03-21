@@ -1,5 +1,6 @@
 use crate::{
-    NodeSpec, PERIOD, util::{parse_obstacle_distance_heading, pose_from_odometry}
+    NodeSpec, PERIOD,
+    util::{parse_obstacle_distance_heading, pose_from_odometry},
 };
 use arg_vals::ArgVals;
 use particle_filter::{ParticleFilter, ParticleFilterSettings};

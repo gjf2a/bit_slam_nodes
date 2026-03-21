@@ -155,9 +155,13 @@ mod tests {
 
     #[test]
     fn test_defuzzify() {
-        for (inseam_size, fuzzy_height) in
-            [(36.0, 1.0), (34.5, 0.75), (33.0, 0.5), (31.5, 0.25), (30.0, 0.0)]
-        {
+        for (inseam_size, fuzzy_height) in [
+            (36.0, 1.0),
+            (34.5, 0.75),
+            (33.0, 0.5),
+            (31.5, 0.25),
+            (30.0, 0.0),
+        ] {
             let fuzzy_height = fz!(fuzzy_height);
             assert_eq!(inseam_size, fuzzy_height.defuzzify(30.0, 36.0))
         }

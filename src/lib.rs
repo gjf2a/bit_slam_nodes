@@ -1,6 +1,6 @@
-pub mod nodes;
 pub mod fuzzy;
 pub mod fuzzy_nodes;
+pub mod nodes;
 pub mod util;
 
 const PERIOD: u64 = 100;
