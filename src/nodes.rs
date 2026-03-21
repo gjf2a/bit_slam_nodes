@@ -21,25 +21,26 @@ pub fn bump_obstacle_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     println!("Publishing on {publish_topic}");
     spec.subscribe(&hazard_topic, move |hazards: HazardDetectionVector| {
         for detection in hazards.detections {
-            let name = detection.header.frame_id.as_str();
-            match name.parse::<Bump>() {
-                Ok(bump) => {
-                    let (distance, heading) = bump.obstacle_at();
-                    let heading: f64 = heading.into();
-                    let msg = Ros2String {
-                        data: format!("({distance},{heading})"),
-                    };
-                    if let Err(e) = publisher.publish(&msg) {
-                        eprintln!("Error publishing {msg:?}: {e}");
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error {e} parsing hazard info '{name}'");
-                }
+            if let Err(e) = publish_obstacle_location(&publisher, &detection.header.frame_id) {
+                eprintln!("Error {e} publishing hazard {}", detection.header.frame_id);
             }
         }
     })?;
     Ok(spec)
+}
+
+fn publish_obstacle_location(
+    publisher: &Publisher<Ros2String>,
+    frame_id: &str,
+) -> anyhow::Result<()> {
+    let bump = frame_id.parse::<Bump>()?;
+    let (distance, heading) = bump.obstacle_at();
+    let heading: f64 = heading.into();
+    let msg = Ros2String {
+        data: format!("({distance},{heading})"),
+    };
+    publisher.publish(&msg)?;
+    Ok(())
 }
 
 pub fn bit_slam_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
@@ -64,29 +65,6 @@ pub fn obstacle_topic_name(robot_name: &str) -> String {
 
 pub fn map_topic_name(robot_name: &str) -> String {
     format!("{robot_name}_maps")
-}
-
-fn publish_particle(
-    publisher: Arc<Mutex<Publisher<Ros2String>>>,
-    particle_filter: &ParticleFilter,
-) {
-    let failure = particle_filter.example_failure();
-    let particle = match failure.as_ref() {
-        None => particle_filter.particles().next().unwrap(),
-        Some(failure) => failure,
-    };
-    match serde_json::to_string(particle) {
-        Ok(data) => {
-            let msg = Ros2String { data };
-            let publisher = smol::block_on(publisher.lock());
-            if let Err(e) = publisher.publish(&msg) {
-                eprintln!("Error {e} when publishing {}", msg.data);
-            }
-        }
-        Err(e) => {
-            eprintln!("Error {e} when serializing particle");
-        }
-    };
 }
 
 struct BitSlamSetup {
@@ -125,15 +103,10 @@ impl BitSlamSetup {
     ) -> anyhow::Result<()> {
         let particle_filter = self.particle_filter.clone();
         spec.subscribe(&self.obstacle_topic, move |obst: Ros2String| {
-            match parse_obstacle_distance_heading(&obst.data) {
-                Ok(obstacle) => {
-                    let mut particle_filter = smol::block_on(particle_filter.lock());
-                    particle_filter.iterate(None, Some(obstacle));
-                    publish_particle(publisher.clone(), &particle_filter);
-                }
-                Err(e) => {
-                    eprintln!("Error {e} parsing '{}'", obst.data);
-                }
+            let publisher = smol::block_on(publisher.lock());
+            let mut particle_filter = smol::block_on(particle_filter.lock());
+            if let Err(e) = publish_particle_obstacle(&obst, &publisher, &mut particle_filter) {
+                eprintln!("Error {e} when updating particle filter with {}", obst.data);
             }
         })
     }
@@ -145,10 +118,48 @@ impl BitSlamSetup {
     ) -> anyhow::Result<()> {
         let particle_filter = self.particle_filter.clone();
         spec.subscribe(&self.odom_topic, move |odom: Odometry| {
-            let pose = pose_from_odometry(&odom);
+            let publisher = smol::block_on(publisher.lock());
             let mut particle_filter = smol::block_on(particle_filter.lock());
-            particle_filter.iterate(Some(pose), None);
-            publish_particle(publisher.clone(), &particle_filter);
+            if let Err(e) = publish_particle_odom(&odom, &publisher, &mut particle_filter) {
+                eprintln!("Error {e} when updating particle filter with {odom:?}");
+            }
         })
     }
+}
+
+fn publish_particle_obstacle(
+    obst: &Ros2String,
+    publisher: &Publisher<Ros2String>,
+    particle_filter: &mut ParticleFilter,
+) -> anyhow::Result<()> {
+    let obstacle = parse_obstacle_distance_heading(&obst.data)?;
+    particle_filter.iterate(None, Some(obstacle));
+    publish_particle(publisher, particle_filter)?;
+    Ok(())
+}
+
+fn publish_particle_odom(
+    odom: &Odometry,
+    publisher: &Publisher<Ros2String>,
+    particle_filter: &mut ParticleFilter,
+) -> anyhow::Result<()> {
+    let pose = pose_from_odometry(&odom);
+    particle_filter.iterate(Some(pose), None);
+    publish_particle(publisher, &particle_filter)?;
+    Ok(())
+}
+
+fn publish_particle(
+    publisher: &Publisher<Ros2String>,
+    particle_filter: &ParticleFilter,
+) -> anyhow::Result<()> {
+    let failure = particle_filter.example_failure();
+    let particle = match failure.as_ref() {
+        None => particle_filter.particles().next().unwrap(),
+        Some(failure) => failure,
+    };
+    let data = serde_json::to_string(particle)?;
+    let msg = Ros2String { data };
+    publisher.publish(&msg)?;
+    Ok(())
 }

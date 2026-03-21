@@ -10,7 +10,12 @@ use futures::StreamExt;
 use smol::lock::Mutex;
 use std::{pin::Pin, sync::Arc};
 
-use r2r::{Context, Node, Publisher, QosProfile, WrappedTypesupport, builtin_interfaces::msg::Time, geometry_msgs::msg::{Twist, TwistStamped, Vector3}, std_msgs::msg::Header};
+use r2r::{
+    Context, Node, Publisher, QosProfile, WrappedTypesupport,
+    builtin_interfaces::msg::Time,
+    geometry_msgs::msg::{Twist, TwistStamped, Vector3},
+    std_msgs::msg::Header,
+};
 
 pub struct NodeSpec {
     node: Arc<Mutex<Node>>,
@@ -90,12 +95,8 @@ pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped
             frame_id: "base_link".to_string(),
         },
         twist: Twist {
-            linear: Vector3 {
-                x, y: 0.0, z: 0.0
-            },
-            angular: Vector3 {
-                x: 0.0, y: 0.0, z
-            }
+            linear: Vector3 { x, y: 0.0, z: 0.0 },
+            angular: Vector3 { x: 0.0, y: 0.0, z },
         },
     })
 }

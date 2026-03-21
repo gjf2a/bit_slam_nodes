@@ -1,7 +1,10 @@
 use std::sync::Arc;
 
 use crate::{
-    NodeSpec, PERIOD, fuzzy::{FuzzySet, FuzzyVar}, twist_stamped, util::find_yaw
+    NodeSpec, PERIOD,
+    fuzzy::{FuzzySet, FuzzyVar},
+    twist_stamped,
+    util::find_yaw,
 };
 use arg_vals::ArgVals;
 use bit_grid::{
@@ -10,7 +13,10 @@ use bit_grid::{
     pt,
 };
 use r2r::{
-    Node, Publisher, geometry_msgs::msg::{Point as Ros2Point, TwistStamped}, nav_msgs::msg::Odometry, std_msgs::msg::String as Ros2String
+    Node, Publisher,
+    geometry_msgs::msg::{Point as Ros2Point, TwistStamped},
+    nav_msgs::msg::Odometry,
+    std_msgs::msg::String as Ros2String,
 };
 use serde::{Deserialize, Serialize};
 use smol::lock::Mutex;
@@ -37,7 +43,7 @@ pub fn goal_fuzzifier_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     })?;
     spec.subscribe(&format!("{robot_name}/odom"), move |odom: Odometry| {
         if let Some(goal) = *smol::block_on(goal.lock()) {
-            if let Err(e) = odom2fuzzy(&odom, &goal, &publisher) {
+            if let Err(e) = publish_odom_fuzzy(&odom, &goal, &publisher) {
                 eprintln!("Error {e} when fuzzifying odometry {odom:?} to {goal}");
             }
         }
@@ -45,7 +51,11 @@ pub fn goal_fuzzifier_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     Ok(spec)
 }
 
-fn odom2fuzzy(odom: &Odometry, goal: &FloatPoint, publisher: &Publisher<Ros2String>) -> anyhow::Result<()> {
+fn publish_odom_fuzzy(
+    odom: &Odometry,
+    goal: &FloatPoint,
+    publisher: &Publisher<Ros2String>,
+) -> anyhow::Result<()> {
     let odom_point = pt!(odom.pose.pose.position.x, odom.pose.pose.position.y);
     let yaw = find_yaw(&odom);
     let error = FuzzyError::new(&odom_point, &yaw, &goal);
@@ -61,21 +71,22 @@ pub fn defuzzifying_error_correcting_node(args: &ArgVals) -> anyhow::Result<Node
     let motor_topic = format!("{robot_name}/cmd_vel_stamped");
     let publisher = spec.publisher::<TwistStamped>(&motor_topic)?;
     let node = Arc::downgrade(&spec.node());
-    spec.subscribe(
-        &fuzzy_topic,
-        move |msg: Ros2String| {
-            if let Some(node) = node.upgrade() {
-                let node = smol::block_on(node.lock());
-                if let Err(e) = fuzzy2twist(&msg, &node, &publisher) {
-                    eprintln!("Error {e} when publishing {}", msg.data);
-                }
+    spec.subscribe(&fuzzy_topic, move |msg: Ros2String| {
+        if let Some(node) = node.upgrade() {
+            let node = smol::block_on(node.lock());
+            if let Err(e) = publish_fuzzy_twist(&msg, &node, &publisher) {
+                eprintln!("Error {e} when publishing {}", msg.data);
             }
-        },
-    )?;
+        }
+    })?;
     Ok(spec)
 }
 
-fn fuzzy2twist(msg: &Ros2String, node: &Node, publisher: &Publisher<TwistStamped>) -> anyhow::Result<()> {
+fn publish_fuzzy_twist(
+    msg: &Ros2String,
+    node: &Node,
+    publisher: &Publisher<TwistStamped>,
+) -> anyhow::Result<()> {
     let fuzzy_error = serde_json::from_str::<FuzzyError>(&msg.data)?;
     let msg = fuzzy_error.defuzzify_twist_stamped(node)?;
     publisher.publish(&msg)?;
@@ -111,7 +122,7 @@ impl FuzzyError {
 
     pub fn defuzzify_twist_stamped(&self, node: &Node) -> anyhow::Result<TwistStamped> {
         let x = self.distance.defuzzify(0.0, X_LIMIT);
-        let turn_limit = Z_LIMIT * (if self.left > self.right {1.0} else {-1.0});
+        let turn_limit = Z_LIMIT * (if self.left > self.right { 1.0 } else { -1.0 });
         let z = (self.left | self.right).defuzzify(0.0, turn_limit);
         twist_stamped(node, x, z)
     }
