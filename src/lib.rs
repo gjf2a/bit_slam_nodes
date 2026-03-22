@@ -43,7 +43,7 @@ impl NodeSpec {
         Ok(node.create_publisher::<P>(topic, QosProfile::sensor_data())?)
     }
 
-    pub fn subscribe<P: WrappedTypesupport + 'static + Send, F: FnMut(P) + Send + 'static>(
+    pub fn subscribe<P: WrappedTypesupport + 'static + Send, F: FnMut(P, &Node) + Send + 'static>(
         &mut self,
         topic: &str,
         handler: F,
@@ -53,11 +53,13 @@ impl NodeSpec {
             node.subscribe::<P>(topic, QosProfile::sensor_data())
                 .map_err(|e| anyhow::anyhow!("Subscribe failed: {}", e))?
         };
+        let node = self.node.clone();
         self.futures.push(Box::pin(async move {
             let mut handler = handler;
             loop {
                 if let Some(msg) = subscriber.next().await {
-                    handler(msg);
+                    let node = smol::block_on(node.lock());
+                    handler(msg, &node);
                 }
             }
         }));

@@ -19,7 +19,7 @@ pub fn bump_obstacle_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     let publish_topic = obstacle_topic_name(robot_name);
     let publisher = spec.publisher::<Ros2String>(&publish_topic)?;
     println!("Publishing on {publish_topic}");
-    spec.subscribe(&hazard_topic, move |hazards: HazardDetectionVector| {
+    spec.subscribe(&hazard_topic, move |hazards: HazardDetectionVector, _| {
         for detection in hazards.detections {
             if let Err(e) = publish_obstacle_location(&publisher, &detection.header.frame_id) {
                 eprintln!("Error {e} publishing hazard {}", detection.header.frame_id);
@@ -112,7 +112,7 @@ impl BitSlamSetup {
         spec: &mut NodeSpec,
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
-        spec.subscribe(&self.obstacle_topic, move |obst: Ros2String| {
+        spec.subscribe(&self.obstacle_topic, move |obst: Ros2String, _| {
             let mut particle_data = smol::block_on(particle_data.lock());
             if let Err(e) = publish_particle_obstacle(&obst, &mut particle_data) {
                 eprintln!("Error {e} when updating particle filter with {}", obst.data);
@@ -125,7 +125,7 @@ impl BitSlamSetup {
         spec: &mut NodeSpec,
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
-        spec.subscribe(&self.odom_topic, move |odom: Odometry| {
+        spec.subscribe(&self.odom_topic, move |odom: Odometry, _| {
             let mut particle_data = smol::block_on(particle_data.lock());
             if let Err(e) = publish_particle_odom(&odom, &mut particle_data) {
                 eprintln!("Error {e} when updating particle filter with {odom:?}");

@@ -37,11 +37,11 @@ pub fn goal_fuzzifier_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     let publisher = spec.publisher::<Ros2String>(&fuzzified_goal_topic_name(robot_name))?;
     let goal = Arc::new(Mutex::new(None));
     let set_goal = goal.clone();
-    spec.subscribe(goal_topic, move |msg: Ros2Point| {
+    spec.subscribe(goal_topic, move |msg: Ros2Point, _| {
         let mut goal = smol::block_on(set_goal.lock());
         *goal = Some(pt!(msg.x, msg.y));
     })?;
-    spec.subscribe(&format!("{robot_name}/odom"), move |odom: Odometry| {
+    spec.subscribe(&format!("{robot_name}/odom"), move |odom: Odometry, _| {
         if let Some(goal) = *smol::block_on(goal.lock()) {
             if let Err(e) = publish_odom_fuzzy(&odom, &goal, &publisher) {
                 eprintln!("Error {e} when fuzzifying odometry {odom:?} to {goal}");
@@ -70,13 +70,9 @@ pub fn defuzzifying_error_correcting_node(args: &ArgVals) -> anyhow::Result<Node
     let fuzzy_topic = fuzzified_goal_topic_name(robot_name);
     let motor_topic = format!("{robot_name}/cmd_vel_stamped");
     let publisher = spec.publisher::<TwistStamped>(&motor_topic)?;
-    let node = Arc::downgrade(&spec.node());
-    spec.subscribe(&fuzzy_topic, move |msg: Ros2String| {
-        if let Some(node) = node.upgrade() {
-            let node = smol::block_on(node.lock());
-            if let Err(e) = publish_fuzzy_twist(&msg, &node, &publisher) {
-                eprintln!("Error {e} when publishing {}", msg.data);
-            }
+    spec.subscribe(&fuzzy_topic, move |msg: Ros2String, node| {
+        if let Err(e) = publish_fuzzy_twist(&msg, &node, &publisher) {
+            eprintln!("Error {e} when publishing {}", msg.data);
         }
     })?;
     Ok(spec)
