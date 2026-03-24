@@ -3,10 +3,10 @@ use crate::{
     util::{parse_obstacle_distance_heading, pose_from_odometry},
 };
 use arg_vals::ArgVals;
-use particle_filter::{ParticleFilter, ParticleFilterSettings};
+use particle_filter::{Particle, ParticleFilter, ParticleFilterSettings, path_plan::paths_from};
 use particle_filter_create3::Bump;
 use r2r::{
-    Publisher, irobot_create_msgs::msg::HazardDetectionVector, nav_msgs::msg::Odometry,
+    Publisher, geometry_msgs::msg::Point as Ros2Point, irobot_create_msgs::msg::HazardDetectionVector, nav_msgs::msg::Odometry,
     std_msgs::msg::String as Ros2String,
 };
 use smol::lock::Mutex;
@@ -57,7 +57,26 @@ pub fn bit_slam_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
 pub fn bit_slam_explorer_node(args: &ArgVals) -> anyhow::Result<NodeSpec> {
     let robot_name = args.get_symbol(0);
     let mut spec = NodeSpec::new(&format!("{robot_name}_explorer_node"), PERIOD)?;
-
+    let target_topic = format!("{robot_name}_bitslam_explorer_goal");
+    let publisher = spec.publisher::<Ros2Point>(&target_topic)?;
+    spec.subscribe(&map_topic_name(robot_name), move |particle_str: Ros2String, _| {
+        match serde_json::from_str::<Particle>(&particle_str.data) {
+            Ok(particle) => {
+                let paths = paths_from(particle.map(), particle.estimated_pose());
+                if let Some(next_step) = paths.shortest_path().and_then(|p| p.get(1).copied()) {
+                    let meters = particle.map().to_meters(next_step);
+                    let target = particle.estimate().convert_to_raw_space(&meters);
+                    let msg = Ros2Point {x: target[0], y: target[1], z: 0.0};
+                    if let Err(e) = publisher.publish(&msg) {
+                        eprintln!("Error {e} when trying to publish {msg:?} to {target_topic}");
+                    }
+                }
+            }
+            Err(e) => {
+                eprintln!("Error {e} when deserializing particle");
+            }
+        }
+    })?;
     Ok(spec)
 }
 
