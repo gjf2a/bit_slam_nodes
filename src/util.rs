@@ -1,5 +1,11 @@
 use bit_grid::{angle::Radians, point::FloatPoint, pose::RobotPose};
 use r2r::nav_msgs::msg::Odometry;
+use r2r::{
+    Node,
+    builtin_interfaces::msg::Time,
+    geometry_msgs::msg::{Twist, TwistStamped, Vector3},
+    std_msgs::msg::Header,
+};
 
 pub fn parse_obstacle_distance_heading(msg: &str) -> anyhow::Result<(f64, Radians)> {
     let fp = msg.parse::<FloatPoint>()?;
@@ -36,4 +42,24 @@ pub fn pose_from_odometry(value: &Odometry) -> RobotPose<Radians> {
     let theta = find_yaw(value);
     result.theta = theta;
     result
+}
+
+pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped> {
+    let clock = node.get_ros_clock();
+    let mut clock = clock.lock().unwrap();
+    let now = clock.get_now()?;
+    let stamp = Time {
+        sec: now.as_secs() as i32,
+        nanosec: now.subsec_nanos(),
+    };
+    Ok(TwistStamped {
+        header: Header {
+            stamp,
+            frame_id: "base_link".to_string(),
+        },
+        twist: Twist {
+            linear: Vector3 { x, y: 0.0, z: 0.0 },
+            angular: Vector3 { x: 0.0, y: 0.0, z },
+        },
+    })
 }
