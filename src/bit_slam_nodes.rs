@@ -1,6 +1,7 @@
 use crate::{
     PERIOD,
     node_struct::{NodeSpec, RunnableNode},
+    odom_topic_name,
     util::{parse_obstacle_distance_heading, pose_from_odometry},
 };
 use arg_vals::{ArgDocs, ArgVals};
@@ -141,6 +142,13 @@ impl BitSlamExplorerNode {
             args.get_str_value("--robot")?
         ))
     }
+
+    pub fn stop_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
+        Ok(format!(
+            "{}_bitslam_explorer_stop",
+            args.get_str_value("--robot")?
+        ))
+    }
 }
 
 impl Default for BitSlamExplorerNode {
@@ -163,8 +171,9 @@ impl RunnableNode for BitSlamExplorerNode {
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let mut spec = NodeSpec::new(&format!("{robot}_explorer_node"), PERIOD)?;
-        let target_topic = self.goal_publish_topic(args)?;
-        let publisher = spec.publisher::<Ros2Point>(&target_topic)?;
+        let pubs = self.publishing_topics(args)?;
+        let point_publisher = spec.publisher::<Ros2Point>(&pubs[0])?;
+        let stop_publisher = spec.publisher::<Ros2String>(&pubs[1])?;
         spec.subscribe(
             &map_topic_name(robot),
             move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
@@ -180,8 +189,12 @@ impl RunnableNode for BitSlamExplorerNode {
                             y: target[1],
                             z: 0.0,
                         };
-                        if let Err(e) = publisher.publish(&msg) {
-                            eprintln!("Error {e} when trying to publish {msg:?} to {target_topic}");
+                        if let Err(e) = point_publisher.publish(&msg) {
+                            eprintln!("Error {e} when trying to publish {msg:?}");
+                        }
+                    } else {
+                        if let Err(e) = stop_publisher.publish(&Ros2String {data: "stop".to_string()}) {
+                            eprintln!("Error {e} when trying to publish stop message");
                         }
                     }
                 }
@@ -194,18 +207,13 @@ impl RunnableNode for BitSlamExplorerNode {
     }
 
     fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        let robot = args.get_str_value("--robot")?;
-        Ok(vec![format!("{robot}_bitslam_explorer_goal")])
+        Ok(vec![self.goal_publish_topic(args)?, self.stop_publish_topic(args)?])
     }
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = args.get_str_value("--robot")?;
         Ok(vec![map_topic_name(robot)])
     }
-}
-
-pub fn odom_topic_name(robot: &str) -> String {
-    format!("{robot}/odom")
 }
 
 pub fn obstacle_topic_name(robot: &str) -> String {

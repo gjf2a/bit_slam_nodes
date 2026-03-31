@@ -4,6 +4,7 @@ use crate::{
     PERIOD,
     fuzzy::{FuzzySet, FuzzyVar},
     node_struct::{NodeSpec, RunnableNode},
+    odom_topic_name,
     util::{find_yaw, twist_stamped},
 };
 use arg_vals::{ArgDocs, ArgVals};
@@ -39,7 +40,11 @@ impl Default for GoalFuzzifierNode {
         Self {
             docs: ArgDocs::new(
                 "goal_fuzzifier_node",
-                &vec![("--robot", "str", ""), ("--fuzzy-goal-topic", "str", "")],
+                &vec![
+                    ("--robot", "str", ""),
+                    ("--fuzzy-goal-topic", "str", ""),
+                    ("--reset-topic", "str", ""),
+                ],
             ),
         }
     }
@@ -62,11 +67,18 @@ impl RunnableNode for GoalFuzzifierNode {
             let mut goal = smol::block_on(set_goal.lock());
             *goal = Some(pt!(msg.x, msg.y));
         })?;
+        let goal_goal = goal.clone();
         spec.subscribe(&subs[1], move |odom: Odometry, _| {
-            if let Some(goal) = *smol::block_on(goal.lock()) {
+            if let Some(goal) = *smol::block_on(goal_goal.lock()) {
                 if let Err(e) = publish_odom_fuzzy(&odom, &goal, &publisher) {
                     eprintln!("Error {e} when fuzzifying odometry {odom:?} to {goal}");
                 }
+            }
+        })?;
+        spec.subscribe(&subs[2], move |msg: Ros2String, _| {
+            if msg.data.to_lowercase() == "stop" {
+                let mut goal = smol::block_on(goal.lock());
+                *goal = None;
             }
         })?;
         Ok(spec)
@@ -81,7 +93,8 @@ impl RunnableNode for GoalFuzzifierNode {
         let robot = args.get_str_value("--robot")?;
         Ok(vec![
             args.get_str_value("--fuzzy_goal_topic")?.clone(),
-            format!("{robot}/odom"),
+            odom_topic_name(robot),
+            args.get_str_value("--reset-topic")?.clone(),
         ])
     }
 
