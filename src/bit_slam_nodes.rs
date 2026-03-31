@@ -6,7 +6,7 @@ use crate::{
 };
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
-    Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump, path_plan::paths_from,
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump, path_plan::PathsBackTo
 };
 use r2r::{
     Publisher, geometry_msgs::msg::Point as Ros2Point,
@@ -91,6 +91,7 @@ impl Default for BitSlamNode {
                     ("--robot", "str", ""),
                     ("--num_particles", "usize", "1000"),
                     ("--meters-per-cell", "f64", "0.1"),
+                    ("--save-map", "bool", "true"),
                 ],
             ),
         }
@@ -129,99 +130,6 @@ impl RunnableNode for BitSlamNode {
         let robot = args.get_str_value("--robot")?;
         Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot)])
     }
-}
-
-pub struct BitSlamExplorerNode {
-    docs: ArgDocs,
-}
-
-impl BitSlamExplorerNode {
-    pub fn goal_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
-        Ok(format!(
-            "{}_bitslam_explorer_goal",
-            args.get_str_value("--robot")?
-        ))
-    }
-
-    pub fn stop_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
-        Ok(format!(
-            "{}_bitslam_explorer_stop",
-            args.get_str_value("--robot")?
-        ))
-    }
-}
-
-impl Default for BitSlamExplorerNode {
-    fn default() -> Self {
-        Self {
-            docs: ArgDocs::new("bit_slam_explorer_node", &vec![("--robot", "str", "")]),
-        }
-    }
-}
-
-impl RunnableNode for BitSlamExplorerNode {
-    fn arg_docs(&self) -> &ArgDocs {
-        &self.docs
-    }
-
-    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
-        self.docs.set_default(param, param_default)
-    }
-
-    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
-        let robot = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&format!("{robot}_explorer_node"), PERIOD)?;
-        let pubs = self.publishing_topics(args)?;
-        let point_publisher = spec.publisher::<Ros2Point>(&pubs[0])?;
-        let stop_publisher = spec.publisher::<Ros2String>(&pubs[1])?;
-        spec.subscribe(
-            &map_topic_name(robot),
-            move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
-                &particle_str.data,
-            ) {
-                Ok(particle) => {
-                    let paths = paths_from(particle.map(), particle.estimated_pose());
-                    if let Some(next_step) = paths.shortest_path().and_then(|p| p.get(1).copied()) {
-                        let meters = particle.map().to_meters(next_step);
-                        let target = particle.estimate().convert_to_raw_space(&meters);
-                        let msg = Ros2Point {
-                            x: target[0],
-                            y: target[1],
-                            z: 0.0,
-                        };
-                        if let Err(e) = point_publisher.publish(&msg) {
-                            eprintln!("Error {e} when trying to publish {msg:?}");
-                        }
-                    } else {
-                        if let Err(e) = stop_publisher.publish(&Ros2String {data: "stop".to_string()}) {
-                            eprintln!("Error {e} when trying to publish stop message");
-                        }
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Error {e} when deserializing particle");
-                }
-            },
-        )?;
-        Ok(spec)
-    }
-
-    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        Ok(vec![self.goal_publish_topic(args)?, self.stop_publish_topic(args)?])
-    }
-
-    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        let robot = args.get_str_value("--robot")?;
-        Ok(vec![map_topic_name(robot)])
-    }
-}
-
-pub fn obstacle_topic_name(robot: &str) -> String {
-    format!("{robot}_obstacles")
-}
-
-pub fn map_topic_name(robot: &str) -> String {
-    format!("{robot}_maps")
 }
 
 struct ParticleData {
@@ -289,15 +197,15 @@ fn publish_particle_obstacle(
     obst: &Ros2String,
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
-    let obstacle = parse_obstacle_distance_heading(&obst.data)?;
-    particle_data.particle_filter.iterate(None, Some(obstacle));
+    let (distance, heading) = parse_obstacle_distance_heading(&obst.data)?;
+    particle_data.particle_filter.iterate(MapInput::Obstacle(distance, heading));
     publish_particle(particle_data)?;
     Ok(())
 }
 
 fn publish_particle_odom(odom: &Odometry, particle_data: &mut ParticleData) -> anyhow::Result<()> {
     let pose = pose_from_odometry(&odom);
-    particle_data.particle_filter.iterate(Some(pose), None);
+    particle_data.particle_filter.iterate(MapInput::Pose(pose));
     publish_particle(particle_data)?;
     Ok(())
 }
@@ -312,4 +220,109 @@ fn publish_particle(particle_data: &ParticleData) -> anyhow::Result<()> {
     let msg = Ros2String { data };
     particle_data.publisher.publish(&msg)?;
     Ok(())
+}
+
+pub struct BitSlamExplorerNode {
+    docs: ArgDocs,
+}
+
+impl BitSlamExplorerNode {
+    pub fn goal_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
+        Ok(format!(
+            "{}_bitslam_explorer_goal",
+            args.get_str_value("--robot")?
+        ))
+    }
+
+    pub fn stop_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
+        Ok(format!(
+            "{}_bitslam_explorer_stop",
+            args.get_str_value("--robot")?
+        ))
+    }
+}
+
+impl Default for BitSlamExplorerNode {
+    fn default() -> Self {
+        Self {
+            docs: ArgDocs::new("bit_slam_explorer_node", &vec![("--robot", "str", "")]),
+        }
+    }
+}
+
+impl RunnableNode for BitSlamExplorerNode {
+    fn arg_docs(&self) -> &ArgDocs {
+        &self.docs
+    }
+
+    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
+        self.docs.set_default(param, param_default)
+    }
+
+    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(&format!("{robot}_explorer_node"), PERIOD)?;
+        let pubs = self.publishing_topics(args)?;
+        let point_publisher = spec.publisher::<Ros2Point>(&pubs[0])?;
+        let stop_publisher = spec.publisher::<Ros2String>(&pubs[1])?;
+        spec.subscribe(
+            &map_topic_name(robot),
+            move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
+                &particle_str.data,
+            ) {
+                Ok(particle) => {
+                    publish_goal_from_particle(&particle, &point_publisher, &stop_publisher)
+                }
+                Err(e) => {
+                    eprintln!("Error {e} when deserializing particle");
+                }
+            },
+        )?;
+        Ok(spec)
+    }
+
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        Ok(vec![
+            self.goal_publish_topic(args)?,
+            self.stop_publish_topic(args)?,
+        ])
+    }
+
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![map_topic_name(robot)])
+    }
+}
+
+fn publish_goal_from_particle(
+    particle: &Particle,
+    point_publisher: &Publisher<Ros2Point>,
+    stop_publisher: &Publisher<Ros2String>,
+) {
+    let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
+    if let Some(next_step) = paths.shortest_path().and_then(|p| p.get(1).copied()) {
+        let meters = particle.map().to_meters(next_step);
+        let target = particle.estimate().convert_to_raw_space(&meters);
+        let msg = Ros2Point {
+            x: target[0],
+            y: target[1],
+            z: 0.0,
+        };
+        if let Err(e) = point_publisher.publish(&msg) {
+            eprintln!("Error {e} when trying to publish {msg:?}");
+        }
+    } else {
+        let data = "stop".to_string();
+        if let Err(e) = stop_publisher.publish(&Ros2String { data }) {
+            eprintln!("Error {e} when trying to publish stop message");
+        }
+    }
+}
+
+pub fn obstacle_topic_name(robot: &str) -> String {
+    format!("{robot}_obstacles")
+}
+
+pub fn map_topic_name(robot: &str) -> String {
+    format!("{robot}_maps")
 }
