@@ -46,7 +46,7 @@ impl Default for GoalFuzzifierNode {
 }
 
 impl RunnableNode for GoalFuzzifierNode {
-    fn args(&self) -> &ArgDocs {
+    fn arg_docs(&self) -> &ArgDocs {
         &self.docs
     }
 
@@ -116,7 +116,7 @@ impl Default for DefuzzifyingErrorCorrectingNode {
 }
 
 impl RunnableNode for DefuzzifyingErrorCorrectingNode {
-    fn args(&self) -> &ArgDocs {
+    fn arg_docs(&self) -> &ArgDocs {
         &self.docs
     }
 

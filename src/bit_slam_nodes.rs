@@ -28,7 +28,7 @@ impl Default for BumpObstacleNode {
 }
 
 impl RunnableNode for BumpObstacleNode {
-    fn args(&self) -> &ArgDocs {
+    fn arg_docs(&self) -> &ArgDocs {
         &self.docs
     }
 
@@ -97,7 +97,7 @@ impl Default for BitSlamNode {
 }
 
 impl RunnableNode for BitSlamNode {
-    fn args(&self) -> &ArgDocs {
+    fn arg_docs(&self) -> &ArgDocs {
         &self.docs
     }
 
@@ -152,7 +152,7 @@ impl Default for BitSlamExplorerNode {
 }
 
 impl RunnableNode for BitSlamExplorerNode {
-    fn args(&self) -> &ArgDocs {
+    fn arg_docs(&self) -> &ArgDocs {
         &self.docs
     }
 

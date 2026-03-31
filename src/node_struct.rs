@@ -7,13 +7,13 @@ use std::{pin::Pin, sync::Arc};
 use r2r::{Context, Node, Publisher, QosProfile, WrappedTypesupport};
 
 pub trait RunnableNode {
-    fn args(&self) -> &ArgDocs;
+    fn arg_docs(&self) -> &ArgDocs;
     fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()>;
     fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>>;
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>>;
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec>;
     fn run(&self) -> anyhow::Result<()> {
-        let arg_docs = self.args();
+        let arg_docs = self.arg_docs();
         let args = arg_docs.get_args_with_defaults();
         eprintln!("Publishing on: {:?}", self.publishing_topics(&args));
         eprintln!("Subscribing to: {:?}", self.subscribing_topics(&args));

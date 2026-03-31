@@ -20,7 +20,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 [[package]]
 name = "arg_vals"
 version = "0.1.0"
-source = "git+https://github.com/gjf2a/arg_vals#78a0c626f769a779896a5678e47636b21d1303ae"
+source = "git+https://github.com/gjf2a/arg_vals#c4c222074fe0b65eb1239a426f2bbf1f07a9a67f"
 dependencies = [
  "anyhow",
 ]
