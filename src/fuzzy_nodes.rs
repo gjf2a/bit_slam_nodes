@@ -51,17 +51,18 @@ impl RunnableNode for GoalFuzzifierNode {
     }
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
-        let robot_name = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&format!("{robot_name}_goal_fuzzifier_node"), PERIOD)?;
-        let goal_topic = args.get_str_value("--fuzzy_goal_topic")?;
-        let publisher = spec.publisher::<Ros2String>(&fuzzified_goal_topic_name(robot_name))?;
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(&format!("{robot}_goal_fuzzifier_node"), PERIOD)?;
+        let subs = self.subscribing_topics(args)?;
+        let pubs = self.publishing_topics(args)?;
+        let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         let goal = Arc::new(Mutex::new(None));
         let set_goal = goal.clone();
-        spec.subscribe(goal_topic, move |msg: Ros2Point, _| {
+        spec.subscribe(&subs[0], move |msg: Ros2Point, _| {
             let mut goal = smol::block_on(set_goal.lock());
             *goal = Some(pt!(msg.x, msg.y));
         })?;
-        spec.subscribe(&format!("{robot_name}/odom"), move |odom: Odometry, _| {
+        spec.subscribe(&subs[1], move |odom: Odometry, _| {
             if let Some(goal) = *smol::block_on(goal.lock()) {
                 if let Err(e) = publish_odom_fuzzy(&odom, &goal, &publisher) {
                     eprintln!("Error {e} when fuzzifying odometry {odom:?} to {goal}");
@@ -69,6 +70,23 @@ impl RunnableNode for GoalFuzzifierNode {
             }
         })?;
         Ok(spec)
+    }
+
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![fuzzified_goal_topic_name(robot)])
+    }
+
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![
+            args.get_str_value("--fuzzy_goal_topic")?.clone(),
+            format!("{robot}/odom"),
+        ])
+    }
+
+    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
+        self.docs.set_default(param, param_default)
     }
 }
 
@@ -103,17 +121,31 @@ impl RunnableNode for DefuzzifyingErrorCorrectingNode {
     }
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
-        let robot_name = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&format!("{robot_name}_defuzz_error_node"), PERIOD)?;
-        let fuzzy_topic = fuzzified_goal_topic_name(robot_name);
-        let motor_topic = format!("{robot_name}/cmd_vel_stamped");
-        let publisher = spec.publisher::<TwistStamped>(&motor_topic)?;
-        spec.subscribe(&fuzzy_topic, move |msg: Ros2String, node| {
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(&format!("{robot}_defuzz_error_node"), PERIOD)?;
+        let subs = self.subscribing_topics(args)?;
+        let pubs = self.publishing_topics(args)?;
+        let publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
+        spec.subscribe(&subs[0], move |msg: Ros2String, node| {
             if let Err(e) = publish_fuzzy_twist(&msg, &node, &publisher) {
                 eprintln!("Error {e} when publishing {}", msg.data);
             }
         })?;
         Ok(spec)
+    }
+
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![format!("{robot}/cmd_vel_stamped")])
+    }
+
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![fuzzified_goal_topic_name(robot)])
+    }
+
+    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
+        self.docs.set_default(param, param_default)
     }
 }
 

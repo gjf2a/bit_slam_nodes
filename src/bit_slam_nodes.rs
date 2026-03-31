@@ -4,8 +4,9 @@ use crate::{
     util::{parse_obstacle_distance_heading, pose_from_odometry},
 };
 use arg_vals::{ArgDocs, ArgVals};
-use particle_filter::{Particle, ParticleFilter, ParticleFilterSettings, path_plan::paths_from};
-use particle_filter_create3::Bump;
+use particle_filter::{
+    Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump, path_plan::paths_from,
+};
 use r2r::{
     Publisher, geometry_msgs::msg::Point as Ros2Point,
     irobot_create_msgs::msg::HazardDetectionVector, nav_msgs::msg::Odometry,
@@ -20,7 +21,9 @@ pub struct BumpObstacleNode {
 
 impl Default for BumpObstacleNode {
     fn default() -> Self {
-        Self { docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", "")]) }
+        Self {
+            docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", "")]),
+        }
     }
 }
 
@@ -29,14 +32,17 @@ impl RunnableNode for BumpObstacleNode {
         &self.docs
     }
 
+    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
+        self.docs.set_default(param, param_default)
+    }
+
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
-        let robot_name = args.get_str_value("--robot")?;
-        let hazard_topic = format!("{robot_name}/hazard_detection");
-        let mut spec = NodeSpec::new(format!("{robot_name}_obstacle_node").as_str(), PERIOD)?;
-        let publish_topic = obstacle_topic_name(robot_name);
-        let publisher = spec.publisher::<Ros2String>(&publish_topic)?;
-        println!("Publishing on {publish_topic}");
-        spec.subscribe(&hazard_topic, move |hazards: HazardDetectionVector, _| {
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(format!("{robot}_obstacle_node").as_str(), PERIOD)?;
+        let subs = self.subscribing_topics(args)?;
+        let pubs = self.publishing_topics(args)?;
+        let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
+        spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for detection in hazards.detections {
                 if let Err(e) = publish_obstacle_location(&publisher, &detection.header.frame_id) {
                     eprintln!("Error {e} publishing hazard {}", detection.header.frame_id);
@@ -44,6 +50,16 @@ impl RunnableNode for BumpObstacleNode {
             }
         })?;
         Ok(spec)
+    }
+
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![obstacle_topic_name(robot)])
+    }
+
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![format!("{robot}/hazard_detection")])
     }
 }
 
@@ -67,13 +83,26 @@ pub struct BitSlamNode {
 
 impl Default for BitSlamNode {
     fn default() -> Self {
-        Self { docs: ArgDocs::new("bit_slam_node", &vec![("--robot", "str", ""), ("--num_particles", "usize", "1000"), ("--meters-per-cell", "f64", "0.1")]) }
+        Self {
+            docs: ArgDocs::new(
+                "bit_slam_node",
+                &vec![
+                    ("--robot", "str", ""),
+                    ("--num_particles", "usize", "1000"),
+                    ("--meters-per-cell", "f64", "0.1"),
+                ],
+            ),
+        }
     }
 }
 
 impl RunnableNode for BitSlamNode {
     fn args(&self) -> &ArgDocs {
         &self.docs
+    }
+
+    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
+        self.docs.set_default(param, param_default)
     }
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
@@ -89,6 +118,16 @@ impl RunnableNode for BitSlamNode {
         setup.subscribe_odometry(&mut spec, particle_data.clone())?;
         Ok(spec)
     }
+
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![map_topic_name(robot)])
+    }
+
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot)])
+    }
 }
 
 pub struct BitSlamExplorerNode {
@@ -97,13 +136,18 @@ pub struct BitSlamExplorerNode {
 
 impl BitSlamExplorerNode {
     pub fn goal_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
-        Ok(format!("{}_bitslam_explorer_goal", args.get_str_value("--robot")?))
+        Ok(format!(
+            "{}_bitslam_explorer_goal",
+            args.get_str_value("--robot")?
+        ))
     }
 }
 
 impl Default for BitSlamExplorerNode {
     fn default() -> Self {
-        Self { docs: ArgDocs::new("bit_slam_explorer_node", &vec![("--robot", "str", "")]) }
+        Self {
+            docs: ArgDocs::new("bit_slam_explorer_node", &vec![("--robot", "str", "")]),
+        }
     }
 }
 
@@ -112,13 +156,17 @@ impl RunnableNode for BitSlamExplorerNode {
         &self.docs
     }
 
+    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
+        self.docs.set_default(param, param_default)
+    }
+
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
-        let robot_name = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&format!("{robot_name}_explorer_node"), PERIOD)?;
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(&format!("{robot}_explorer_node"), PERIOD)?;
         let target_topic = self.goal_publish_topic(args)?;
         let publisher = spec.publisher::<Ros2Point>(&target_topic)?;
         spec.subscribe(
-            &map_topic_name(robot_name),
+            &map_topic_name(robot),
             move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
                 &particle_str.data,
             ) {
@@ -144,14 +192,28 @@ impl RunnableNode for BitSlamExplorerNode {
         )?;
         Ok(spec)
     }
+
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![format!("{robot}_bitslam_explorer_goal")])
+    }
+
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = args.get_str_value("--robot")?;
+        Ok(vec![map_topic_name(robot)])
+    }
 }
 
-pub fn obstacle_topic_name(robot_name: &str) -> String {
-    format!("{robot_name}_obstacles")
+pub fn odom_topic_name(robot: &str) -> String {
+    format!("{robot}/odom")
 }
 
-pub fn map_topic_name(robot_name: &str) -> String {
-    format!("{robot_name}_maps")
+pub fn obstacle_topic_name(robot: &str) -> String {
+    format!("{robot}_obstacles")
+}
+
+pub fn map_topic_name(robot: &str) -> String {
+    format!("{robot}_maps")
 }
 
 struct ParticleData {
@@ -170,15 +232,15 @@ struct BitSlamSetup {
 
 impl BitSlamSetup {
     fn new(args: &ArgVals) -> anyhow::Result<Self> {
-        let robot_name = format!("/{}", args.get_str_value("--robot")?);
+        let robot = format!("/{}", args.get_str_value("--robot")?);
         let mut settings = ParticleFilterSettings::default();
         settings.num_particles = args.get_value("--num-particles")?;
         settings.square_size_m = args.get_value("--meters-per-cell")?;
         Ok(Self {
-            node_name: format!("{robot_name}_bitslam_node"),
-            map_topic: map_topic_name(&robot_name),
-            obstacle_topic: obstacle_topic_name(&robot_name),
-            odom_topic: format!("{robot_name}/odom"),
+            node_name: format!("{robot}_bitslam_node"),
+            map_topic: map_topic_name(&robot),
+            obstacle_topic: obstacle_topic_name(&robot),
+            odom_topic: odom_topic_name(&robot),
             settings,
             period: args.get_value("-spin_time").unwrap_or(PERIOD),
         })
