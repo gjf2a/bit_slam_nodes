@@ -22,8 +22,11 @@ pub trait RunnableNode {
             eprintln!("{arg_docs}");
             Ok(())
         } else {
+            let running = Arc::new(AtomicCell::new(true));
+            let r = running.clone();
+            ctrlc::set_handler(move || r.store(false))?;
             let spec = self.spec(&args)?;
-            spec.run()
+            spec.run(running)
         }
     }
 }
@@ -80,10 +83,7 @@ impl NodeSpec {
         Ok(())
     }
 
-    pub fn run(self) -> anyhow::Result<()> {
-        let running = Arc::new(AtomicCell::new(true));
-        let r = running.clone();
-        ctrlc::set_handler(move || r.store(false))?;
+    pub fn run(self, running: Arc<AtomicCell<bool>>) -> anyhow::Result<()> {
         smol::block_on(async {
             for future in self.futures {
                 smol::spawn(future).detach();
