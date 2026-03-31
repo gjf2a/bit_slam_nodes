@@ -9,7 +9,9 @@ smol = "2.0.2"
 futures = "0.3.32"
 anyhow = "1.0.32"
 crossbeam = "0.8.4"
-ctrlc = "3.4"
+ctrlc = "3.5.2"
+serde_json = "1.0.149"
+serde = {version = "1.0.228", features = ["derive"]}
 arg_vals = {git = "https://github.com/gjf2a/arg_vals"}
 particle_filter = {git = "https://github.com/gjf2a/particle_filter"}
-particle_filter_create3 = {git = "https://github.com/gjf2a/particle_filter_create3"}
+bit_grid = {git = "https://github.com/gjf2a/bit_grid"}
