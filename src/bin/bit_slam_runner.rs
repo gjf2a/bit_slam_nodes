@@ -11,7 +11,14 @@ use crossbeam::atomic::AtomicCell;
 fn main() -> anyhow::Result<()> {
     let explorer = BitSlamExplorerNode::default();
     let mut goal_fuzzifier = GoalFuzzifierNode::default();
-    goal_fuzzifier.add_default("--fuzzy-goal-topic", &explorer.goal_publish_topic(&explorer.arg_docs().get_args_with_defaults())?)?;
+    goal_fuzzifier.add_default(
+        "--fuzzy-goal-topic",
+        &explorer.goal_publish_topic(&explorer.arg_docs().get_args_with_defaults())?,
+    )?;
+    goal_fuzzifier.add_default(
+        "--reset-topic",
+        &explorer.goal_publish_topic(&explorer.arg_docs().get_args_with_defaults())?,
+    )?;
     let nodes: Vec<Box<dyn RunnableNode>> = vec![
         Box::new(BitSlamNode::default()),
         Box::new(explorer),
@@ -30,8 +37,9 @@ fn main() -> anyhow::Result<()> {
         for node in nodes {
             let args = node.arg_docs().get_args_with_defaults();
             let spec = node.spec(&args)?;
+            let running = running.clone();
             std::thread::spawn(move || {
-                if let Err(e) = spec.run() {
+                if let Err(e) = spec.run(running) {
                     eprintln!("Error: {e}");
                 }
             });
