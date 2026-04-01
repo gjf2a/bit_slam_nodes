@@ -5,6 +5,7 @@ use crate::{
     util::{parse_obstacle_distance_heading, pose_from_odometry},
 };
 use arg_vals::{ArgDocs, ArgVals};
+use chrono::Local;
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump, path_plan::PathsBackTo
 };
@@ -115,6 +116,7 @@ impl RunnableNode for BitSlamNode {
         let particle_data = Arc::new(Mutex::new(ParticleData {
             particle_filter,
             publisher,
+            map_saved: false,
         }));
         setup.subscribe_obstacle(&mut spec, particle_data.clone())?;
         setup.subscribe_odometry(&mut spec, particle_data.clone())?;
@@ -135,6 +137,7 @@ impl RunnableNode for BitSlamNode {
 struct ParticleData {
     particle_filter: ParticleFilter,
     publisher: Publisher<Ros2String>,
+    map_saved: bool,
 }
 
 struct BitSlamSetup {
@@ -152,6 +155,7 @@ impl BitSlamSetup {
         let mut settings = ParticleFilterSettings::default();
         settings.num_particles = args.get_value("--num-particles")?;
         settings.square_size_m = args.get_value("--meters-per-cell")?;
+        settings.save_inputs = args.get_value("--save-map")?;
         Ok(Self {
             node_name: format!("{robot}_bitslam_node"),
             map_topic: map_topic_name(&robot),
@@ -210,12 +214,19 @@ fn publish_particle_odom(odom: &Odometry, particle_data: &mut ParticleData) -> a
     Ok(())
 }
 
-fn publish_particle(particle_data: &ParticleData) -> anyhow::Result<()> {
+fn publish_particle(particle_data: &mut ParticleData) -> anyhow::Result<()> {
     let failure = particle_data.particle_filter.example_failure();
     let particle = match failure.as_ref() {
         None => particle_data.particle_filter.particles().next().unwrap(),
         Some(failure) => failure,
     };
+    if !particle_data.map_saved && PathsBackTo::done(&particle) {
+        let json = serde_json::to_string(&particle_data.particle_filter)?;
+        let now = Local::now();
+        let output_filename = format!("bit_slam_{}.json", now.format("%Y_%m_%d_%H_%M_%S"));
+        std::fs::write(output_filename, json)?;
+        particle_data.map_saved = true;
+    }
     let data = serde_json::to_string(particle)?;
     let msg = Ros2String { data };
     particle_data.publisher.publish(&msg)?;
