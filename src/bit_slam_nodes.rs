@@ -242,14 +242,14 @@ impl BitSlamExplorerNode {
     pub fn goal_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
         Ok(format!(
             "{}_bitslam_explorer_goal",
-            args.get_str_value("--robot")?
+            args.get_str_value("--robot").ok_or("robot_name")
         ))
     }
 
     pub fn stop_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
         Ok(format!(
             "{}_bitslam_explorer_stop",
-            args.get_str_value("--robot")?
+            args.get_str_value("--robot").ok_or("robot_name")
         ))
     }
 }
