@@ -15,8 +15,8 @@ pub trait RunnableNode {
     fn run(&self) -> anyhow::Result<()> {
         let arg_docs = self.arg_docs();
         let args = arg_docs.get_args_with_defaults();
-        eprintln!("Publishing on: {:?}", self.publishing_topics(&args));
-        eprintln!("Subscribing to: {:?}", self.subscribing_topics(&args));
+        eprintln!("Publishing on: {:?}", self.publishing_topics(&args)?);
+        eprintln!("Subscribing to: {:?}", self.subscribing_topics(&args)?);
         let actual_args = ArgVals::env();
         if actual_args.len() == 0 {
             eprintln!("{arg_docs}");

@@ -1,8 +1,5 @@
 use crate::{
-    PERIOD,
-    node_struct::{NodeSpec, RunnableNode},
-    odom_topic_name,
-    util::{parse_obstacle_distance_heading, pose_from_odometry},
+    PERIOD, node_struct::{NodeSpec, RunnableNode}, odom_topic_name, robot_name, util::{parse_obstacle_distance_heading, pose_from_odometry}
 };
 use arg_vals::{ArgDocs, ArgVals};
 use chrono::Local;
@@ -55,12 +52,11 @@ impl RunnableNode for BumpObstacleNode {
     }
 
     fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        let robot = args.get_str_value("--robot")?;
-        Ok(vec![obstacle_topic_name(robot)])
+        Ok(vec![obstacle_topic_name(robot_name!(args))])
     }
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        let robot = args.get_str_value("--robot")?;
+        let robot = robot_name!(args);
         Ok(vec![format!("{robot}/hazard_detection")])
     }
 }
@@ -125,12 +121,11 @@ impl RunnableNode for BitSlamNode {
     }
 
     fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        let robot = args.get_str_value("--robot")?;
-        Ok(vec![map_topic_name(robot)])
+        Ok(vec![map_topic_name(robot_name!(args))])
     }
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        let robot = args.get_str_value("--robot")?;
+        let robot = robot_name!(args);
         Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot)])
     }
 }
@@ -242,14 +237,14 @@ impl BitSlamExplorerNode {
     pub fn goal_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
         Ok(format!(
             "{}_bitslam_explorer_goal",
-            args.get_str_value("--robot").unwrap_or(&"robot_name".to_string())
+            robot_name!(args)
         ))
     }
 
     pub fn stop_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
         Ok(format!(
             "{}_bitslam_explorer_stop",
-            args.get_str_value("--robot").unwrap_or(&"robot_name".to_string())
+            robot_name!(args)
         ))
     }
 }
@@ -301,8 +296,7 @@ impl RunnableNode for BitSlamExplorerNode {
     }
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        let robot = args.get_str_value("--robot")?;
-        Ok(vec![map_topic_name(robot)])
+        Ok(vec![map_topic_name(robot_name!(args))])
     }
 }
 
