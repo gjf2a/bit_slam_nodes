@@ -47,7 +47,7 @@ impl RunnableNode for BumpObstacleNode {
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for detection in hazards.detections {
                 if let Err(e) = publish_obstacle_location(&publisher, &detection.header.frame_id) {
-                    eprintln!("Error {e} publishing hazard {}", detection.header.frame_id);
+                    eprintln!("Error {e} when trying to publish hazard {}", detection.header.frame_id);
                 }
             }
         })?;
@@ -69,13 +69,14 @@ fn publish_obstacle_location(
     publisher: &Publisher<Ros2String>,
     frame_id: &str,
 ) -> anyhow::Result<()> {
-    let bump = frame_id.parse::<Bump>()?;
-    let (distance, heading) = bump.obstacle_at();
-    let heading: f64 = heading.into();
-    let msg = Ros2String {
-        data: format!("({distance},{heading})"),
-    };
-    publisher.publish(&msg)?;
+    if let Ok(bump) = frame_id.parse::<Bump>() {
+        let (distance, heading) = bump.obstacle_at();
+        let heading: f64 = heading.into();
+        let msg = Ros2String {
+            data: format!("({distance},{heading})"),
+        };
+        publisher.publish(&msg)?;
+    }
     Ok(())
 }
 
