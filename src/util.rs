@@ -1,4 +1,4 @@
-use bit_grid::{angle::Radians, point::FloatPoint, pose::RobotPose};
+use particle_filter::{angle::Radians, point::FloatPoint, pose::RobotPose};
 use r2r::nav_msgs::msg::Odometry;
 use r2r::{
     Node,

@@ -8,9 +8,9 @@ use crate::{
     util::{find_yaw, twist_stamped},
 };
 use arg_vals::{ArgDocs, ArgVals};
-use bit_grid::{
+use particle_filter::{
     angle::Radians,
-    point::{FloatPoint, Point},
+    point::FloatPoint,
     pt,
 };
 use r2r::{
@@ -212,7 +212,7 @@ impl FuzzyError {
 mod tests {
     use std::f64::consts::PI;
 
-    use bit_grid::{angle::Radians, point::Point, pt};
+    use particle_filter::{angle::Radians, pt};
 
     use crate::{fuzzy::FuzzyVar, fuzzy_nodes::FuzzyError};
 
