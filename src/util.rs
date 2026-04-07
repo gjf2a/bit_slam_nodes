@@ -1,5 +1,7 @@
+use particle_filter::BitGridMap;
 use particle_filter::{angle::Radians, point::FloatPoint, pose::RobotPose};
-use r2r::nav_msgs::msg::Odometry;
+use r2r::geometry_msgs::msg::{Point as Ros2Point, Pose, Quaternion};
+use r2r::nav_msgs::msg::{MapMetaData, OccupancyGrid, Odometry};
 use r2r::{
     Node,
     builtin_interfaces::msg::Time,
@@ -44,7 +46,7 @@ pub fn pose_from_odometry(value: &Odometry) -> RobotPose<Radians> {
     result
 }
 
-pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped> {
+pub fn stamped_header(node: &Node) -> anyhow::Result<Header> {
     let clock = node.get_ros_clock();
     let mut clock = clock.lock().unwrap();
     let now = clock.get_now()?;
@@ -52,14 +54,44 @@ pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped
         sec: now.as_secs() as i32,
         nanosec: now.subsec_nanos(),
     };
+    Ok(Header {
+        stamp,
+        frame_id: "base_link".to_string(),
+    })
+}
+
+pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped> {    
     Ok(TwistStamped {
-        header: Header {
-            stamp,
-            frame_id: "base_link".to_string(),
-        },
+        header: stamped_header(node)?,
         twist: Twist {
             linear: Vector3 { x, y: 0.0, z: 0.0 },
             angular: Vector3 { x: 0.0, y: 0.0, z },
         },
+    })
+}
+
+pub fn bit2ros(node: &Node, map: &BitGridMap) -> anyhow::Result<OccupancyGrid> {
+    let header = stamped_header(node)?;
+    let origin_corner = map.to_meters(map.bounding_box().min());
+    let info = MapMetaData {
+        map_load_time: header.stamp.clone(),
+        width: map.width() as u32,
+        height: map.height() as u32,
+        resolution: map.square_size_m() as f32,
+        origin: Pose {
+            position: Ros2Point {x: origin_corner[0], y: origin_corner[1], z: 0.0},
+            orientation: Quaternion {x: 0.0, y: 0.0, z: 0.0, w: 0.0},
+        }
+    };
+    let bounds = map.bounding_box();
+    Ok(OccupancyGrid {
+        header, 
+        info, 
+        data: bounds.col_major_coord_iter().map(|p| match map.cell_for(&(p - bounds.min())) {
+            particle_filter::Cell::Obstacle => 1,
+            particle_filter::Cell::Space => 0,
+            particle_filter::Cell::Unvisited => -1,
+            particle_filter::Cell::Inconsistent => 10,
+        }).collect()
     })
 }
