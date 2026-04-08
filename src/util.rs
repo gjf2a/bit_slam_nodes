@@ -1,5 +1,4 @@
-use particle_filter::bit_grid::ColumnMajorCoordIter;
-use particle_filter::{BitGridMap, Particle};
+use particle_filter::Particle;
 use particle_filter::{angle::Radians, point::FloatPoint, pose::RobotPose};
 use r2r::geometry_msgs::msg::{Point as Ros2Point, Pose, Quaternion};
 use r2r::nav_msgs::msg::{MapMetaData, OccupancyGrid, Odometry};
@@ -61,7 +60,7 @@ pub fn stamped_header(node: &Node) -> anyhow::Result<Header> {
     })
 }
 
-pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped> {    
+pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped> {
     Ok(TwistStamped {
         header: stamped_header(node)?,
         twist: Twist {
@@ -71,16 +70,10 @@ pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped
     })
 }
 
-pub const UNVISITED: i8 = 0;
-pub const SPACE: i8 = 1;
-pub const OBSTACLE: i8 = 2;
-pub const ROBOT: i8 = 4;
-
 pub fn particle2rosgrid(node: &Node, particle: &Particle) -> anyhow::Result<OccupancyGrid> {
     let map = particle.map();
     let bounds = map.bounding_box();
     let header = stamped_header(node)?;
-    let shadow = particle.robot_shadow();
     let origin_corner = map.to_meters(bounds.min());
     let info = MapMetaData {
         map_load_time: header.stamp.clone(),
@@ -88,39 +81,33 @@ pub fn particle2rosgrid(node: &Node, particle: &Particle) -> anyhow::Result<Occu
         height: map.height() as u32,
         resolution: map.square_size_m() as f32,
         origin: Pose {
-            position: Ros2Point {x: origin_corner[0], y: origin_corner[1], z: 0.0},
-            orientation: Quaternion {x: 0.0, y: 0.0, z: 0.0, w: 0.0},
-        }
+            position: Ros2Point {
+                x: origin_corner[0],
+                y: origin_corner[1],
+                z: 0.0,
+            },
+            orientation: Quaternion {
+                x: 0.0,
+                y: 0.0,
+                z: 0.0,
+                w: 0.0,
+            },
+        },
     };
     Ok(OccupancyGrid {
-        header, 
-        info, 
-        data: bounds.col_major_coord_iter().map(|p| {
-            let mut square = UNVISITED;
-            if map.all_spaces().contains(&p) {
-                square += SPACE;
-            }
-            if map.all_obstacles().contains(&p) {
-                square += OBSTACLE;
-            }
-            if shadow.contains(&p) {
-                square += ROBOT;
-            }
-            square
-        }).collect()
+        header,
+        info,
+        data: bounds
+            .col_major_coord_iter()
+            .map(|p| {
+                if map.all_obstacles().contains(&p) {
+                    1
+                } else if map.all_spaces().contains(&p) {
+                    0
+                } else {
+                    -1
+                }
+            })
+            .collect(),
     })
-}
-
-pub fn rosgrid2map(grid: &OccupancyGrid) -> (BitGridMap, RobotPose<Radians>) {
-    todo!("Extract robot position and radius from the map, then the map itself.")
-}
-
-fn pose_from(grid: &OccupancyGrid) -> RobotPose<Radians> {
-    todo!("Extract robot pose (and radius?) from the map.")
-}
-
-fn pos_iter_from(grid: &OccupancyGrid) -> ColumnMajorCoordIter {
-    let origin = grid.info.origin.position.clone();
-    todo!("Create a position iterator that is column-major to traverse the grid.")
-    //ColumnMajorCoordIter::new(x_start, y_start, width, height)
 }

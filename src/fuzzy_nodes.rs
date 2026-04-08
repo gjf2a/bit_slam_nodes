@@ -8,11 +8,7 @@ use crate::{
     util::{find_yaw, twist_stamped},
 };
 use arg_vals::{ArgDocs, ArgVals};
-use particle_filter::{
-    angle::Radians,
-    point::FloatPoint,
-    pt,
-};
+use particle_filter::{angle::Radians, point::FloatPoint, pt};
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::{Point as Ros2Point, TwistStamped},
