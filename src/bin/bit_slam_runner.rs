@@ -35,7 +35,6 @@ fn main() -> anyhow::Result<()> {
         let r = running.clone();
         ctrlc::set_handler(move || r.store(false))?;
         for node in nodes {
-            eprintln!("Starting a node");
             let args = node.arg_docs().get_args_with_defaults();
             let spec = node.spec(&args)?;
             let running = running.clone();
