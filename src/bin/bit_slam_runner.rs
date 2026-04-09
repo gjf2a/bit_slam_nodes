@@ -1,4 +1,4 @@
-use std::{sync::Arc, time::Duration};
+use std::{sync::Arc, thread, time::Duration};
 
 use arg_vals::{ArgVals, merged_arg_docs};
 use bit_slam_nodes::{
@@ -34,18 +34,24 @@ fn main() -> anyhow::Result<()> {
         let running = Arc::new(AtomicCell::new(true));
         let r = running.clone();
         ctrlc::set_handler(move || r.store(false))?;
+        let mut handles = vec![];
         for node in nodes {
             let args = node.arg_docs().get_args_with_defaults();
             let spec = node.spec(&args)?;
             let running = running.clone();
-            std::thread::spawn(move || {
+            handles.push(thread::spawn(move || {
                 if let Err(e) = spec.run(running) {
                     eprintln!("Error: {e}");
                 }
-            });
+            }));
         }
         while running.load() {
-            std::thread::sleep(Duration::from_millis(100));
+            thread::sleep(Duration::from_millis(100));
+        }
+        for handle in handles {
+            if let Err(e) = handle.join() {
+                eprintln!("Error {e:?} when joining threads");
+            }
         }
     }
     Ok(())
