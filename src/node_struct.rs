@@ -131,8 +131,13 @@ impl NodeSpec {
                 smol::spawn(future).detach();
             }
             while running.load() {
-                let mut node = smol::block_on(self.node.lock());
-                node.spin_once(std::time::Duration::from_millis(self.period));
+                let timeout = std::time::Duration::from_millis(self.period);
+                {
+                    let mut node = smol::block_on(self.node.lock());
+                    node.spin_once(timeout);
+                }
+                smol::Timer::after(timeout).await;
+                
             }
         });
         Ok(())
