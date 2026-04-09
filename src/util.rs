@@ -1,4 +1,4 @@
-use particle_filter::Particle;
+use particle_filter::{BitGridMap, Particle};
 use particle_filter::{angle::Radians, point::FloatPoint, pose::RobotPose};
 use r2r::geometry_msgs::msg::{Point as Ros2Point, Pose, Quaternion};
 use r2r::nav_msgs::msg::{MapMetaData, OccupancyGrid, Odometry};
@@ -71,11 +71,18 @@ pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped
 }
 
 pub fn particle2rosgrid(node: &Node, particle: &Particle) -> anyhow::Result<OccupancyGrid> {
-    let map = particle.map();
-    let bounds = map.bounding_box();
     let header = stamped_header(node)?;
-    let origin_corner = map.to_meters(bounds.min());
-    let info = MapMetaData {
+    let info = map_meta_data(&header, particle.map());
+    Ok(OccupancyGrid {
+        header,
+        info,
+        data: occupancy_grid_vec(particle.map()),
+    })
+}
+
+fn map_meta_data(header: &Header, map: &BitGridMap) -> MapMetaData {
+    let origin_corner = map.to_meters(map.bounding_box().min());
+    MapMetaData {
         map_load_time: header.stamp.clone(),
         width: map.width() as u32,
         height: map.height() as u32,
@@ -93,21 +100,20 @@ pub fn particle2rosgrid(node: &Node, particle: &Particle) -> anyhow::Result<Occu
                 w: 0.0,
             },
         },
-    };
-    Ok(OccupancyGrid {
-        header,
-        info,
-        data: bounds
-            .col_major_coord_iter()
-            .map(|p| {
-                if map.all_obstacles().contains(&p) {
-                    1
-                } else if map.all_spaces().contains(&p) {
-                    0
-                } else {
-                    -1
-                }
-            })
-            .collect(),
-    })
+    }
+}
+
+fn occupancy_grid_vec(map: &BitGridMap) -> Vec<i8> {
+    map.bounding_box()
+        .col_major_coord_iter()
+        .map(|p| {
+            if map.all_obstacles().contains(&p) {
+                1
+            } else if map.all_spaces().contains(&p) {
+                0
+            } else {
+                -1
+            }
+        })
+        .collect()
 }
