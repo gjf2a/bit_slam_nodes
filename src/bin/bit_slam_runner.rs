@@ -36,6 +36,7 @@ fn main() -> anyhow::Result<()> {
         ctrlc::set_handler(move || r.store(false))?;
         for node in nodes {
             let args = node.arg_docs().get_args_with_defaults();
+            eprintln!("args: {args:?}");
             let spec = node.spec(&args)?;
             let running = running.clone();
             std::thread::spawn(move || {
