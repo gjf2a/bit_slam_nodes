@@ -137,7 +137,6 @@ impl NodeSpec {
                     node.spin_once(timeout);
                 }
                 smol::Timer::after(timeout).await;
-                
             }
         });
         Ok(())
