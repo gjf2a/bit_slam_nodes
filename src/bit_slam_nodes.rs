@@ -203,9 +203,10 @@ impl BitSlamSetup {
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
         spec.subscribe(&self.odom_topic, move |odom: Odometry, node| {
-            let mut particle_data = smol::block_on(particle_data.lock());
-            if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
-                eprintln!("Error {e} when updating particle filter with {odom:?}");
+            if let Some(mut particle_data) = particle_data.try_lock() {
+                if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
+                    eprintln!("Error {e} when updating particle filter with {odom:?}");
+                }
             }
         })
     }
