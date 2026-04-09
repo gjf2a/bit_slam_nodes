@@ -39,6 +39,7 @@ pub struct NodeSpec {
 
 impl NodeSpec {
     pub fn new(node_name: &str, period: u64) -> anyhow::Result<Self> {
+        eprintln!("creating spec for node {node_name}");
         let context = Context::create()?;
         let node = Arc::new(Mutex::new(Node::create(context, node_name, "")?));
         Ok(Self {

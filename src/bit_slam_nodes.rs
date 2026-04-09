@@ -96,7 +96,7 @@ impl Default for BitSlamNode {
                 "bit_slam_node",
                 &vec![
                     ("--robot", "str", ""),
-                    ("--num_particles", "usize", "1000"),
+                    ("--num-particles", "usize", "1000"),
                     ("--meters-per-cell", "f64", "0.1"),
                     ("--save-map", "bool", "true"),
                 ],
@@ -164,7 +164,7 @@ struct BitSlamSetup {
 
 impl BitSlamSetup {
     fn new(args: &ArgVals) -> anyhow::Result<Self> {
-        let robot = format!("/{}", args.get_str_value("--robot")?);
+        let robot = format!("{}", args.get_str_value("--robot")?);
         let mut settings = ParticleFilterSettings::default();
         settings.num_particles = args.get_value("--num-particles")?;
         settings.square_size_m = args.get_value("--meters-per-cell")?;

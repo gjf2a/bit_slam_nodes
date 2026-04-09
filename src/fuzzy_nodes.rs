@@ -88,7 +88,7 @@ impl RunnableNode for GoalFuzzifierNode {
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = args.get_str_value("--robot")?;
         Ok(vec![
-            args.get_str_value("--fuzzy_goal_topic")?.clone(),
+            args.get_str_value("--fuzzy-goal-topic")?.clone(),
             odom_topic_name(robot),
             args.get_str_value("--reset-topic")?.clone(),
         ])
