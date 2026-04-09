@@ -134,7 +134,7 @@ impl RunnableNode for BitSlamNode {
 
     fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         Ok(vec![
-            map_topic_name(robot_name!(args)),
+            particle_topic_name(robot_name!(args)),
             occupancy_grid_topic_name(robot_name!(args)),
         ])
     }
@@ -172,7 +172,7 @@ impl BitSlamSetup {
         Ok(Self {
             node_name: format!("{robot}_bitslam_node"),
             occupancy_grid_topic: occupancy_grid_topic_name(&robot),
-            particle_topic: map_topic_name(&robot),
+            particle_topic: particle_topic_name(&robot),
             obstacle_topic: obstacle_topic_name(&robot),
             odom_topic: odom_topic_name(&robot),
             settings,
@@ -295,7 +295,7 @@ impl RunnableNode for BitSlamExplorerNode {
         let point_publisher = spec.publisher::<Ros2Point>(&pubs[0])?;
         let stop_publisher = spec.publisher::<Ros2String>(&pubs[1])?;
         spec.subscribe(
-            &map_topic_name(robot),
+            &particle_topic_name(robot),
             move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
                 &particle_str.data,
             ) {
@@ -318,7 +318,7 @@ impl RunnableNode for BitSlamExplorerNode {
     }
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        Ok(vec![map_topic_name(robot_name!(args))])
+        Ok(vec![particle_topic_name(robot_name!(args))])
     }
 }
 
@@ -329,6 +329,7 @@ fn publish_goal_from_particle(
 ) {
     let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
     if let Some(next_step) = paths.shortest_path().and_then(|p| p.get(1).copied()) {
+        eprintln!("There is a path");
         let meters = particle.map().to_meters(next_step);
         let target = particle.estimate().convert_to_raw_space(&meters);
         let msg = Ros2Point {
@@ -340,6 +341,7 @@ fn publish_goal_from_particle(
             eprintln!("Error {e} when trying to publish {msg:?}");
         }
     } else {
+        eprintln!("There is not a path");
         let data = "stop".to_string();
         if let Err(e) = stop_publisher.publish(&Ros2String { data }) {
             eprintln!("Error {e} when trying to publish stop message");
@@ -351,7 +353,7 @@ pub fn obstacle_topic_name(robot: &str) -> String {
     format!("{robot}_obstacles")
 }
 
-pub fn map_topic_name(robot: &str) -> String {
+pub fn particle_topic_name(robot: &str) -> String {
     format!("{robot}_maps")
 }
 
