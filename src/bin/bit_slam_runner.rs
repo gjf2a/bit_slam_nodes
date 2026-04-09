@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use arg_vals::{ArgVals, merged_arg_docs};
 use bit_slam_nodes::{
@@ -44,7 +44,9 @@ fn main() -> anyhow::Result<()> {
                 }
             });
         }
-        while running.load() {}
+        while running.load() {
+            std::thread::sleep(Duration::from_millis(100));
+        }
     }
     Ok(())
 }
