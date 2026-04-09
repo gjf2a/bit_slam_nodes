@@ -204,9 +204,12 @@ impl BitSlamSetup {
     ) -> anyhow::Result<()> {
         spec.subscribe(&self.odom_topic, move |odom: Odometry, node| {
             if let Some(mut particle_data) = particle_data.try_lock() {
+                eprintln!("Inside odometry critical section");
                 if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
                     eprintln!("Error {e} when updating particle filter with {odom:?}");
                 }
+            } else {
+                eprintln!("Skipped odometry critical section");
             }
         })
     }
