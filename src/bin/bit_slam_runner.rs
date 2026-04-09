@@ -38,6 +38,16 @@ fn main() -> anyhow::Result<()> {
         for node in nodes {
             let args = node.arg_docs().get_args_with_defaults();
             let spec = node.spec(&args)?;
+            print!("Publishing on:");
+            for p in node.publishing_topics(&args)? {
+                print!(" {p}");
+            }
+            println!();
+            print!("Subscribing to:");
+            for s in node.subscribing_topics(&args)? {
+                print!(" {s}");
+            }
+            println!();
             let running = running.clone();
             handles.push(thread::spawn(move || {
                 if let Err(e) = spec.run(running) {
