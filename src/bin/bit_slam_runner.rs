@@ -17,7 +17,7 @@ fn main() -> anyhow::Result<()> {
     )?;
     goal_fuzzifier.add_default(
         "--reset-topic",
-        &explorer.goal_publish_topic(&explorer.arg_docs().get_args_with_defaults())?,
+        &explorer.stop_publish_topic(&explorer.arg_docs().get_args_with_defaults())?,
     )?;
     let nodes: Vec<Box<dyn RunnableNode>> = vec![
         Box::new(BitSlamNode::default()),
