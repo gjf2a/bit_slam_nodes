@@ -203,6 +203,7 @@ impl BitSlamSetup {
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
         spec.subscribe(&self.odom_topic, move |odom: Odometry, node| {
+            eprintln!("Received odometry message");
             if let Some(mut particle_data) = particle_data.try_lock() {
                 eprintln!("Inside odometry critical section");
                 if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
@@ -304,6 +305,7 @@ impl RunnableNode for BitSlamExplorerNode {
                 &particle_str.data,
             ) {
                 Ok(particle) => {
+                    eprintln!("Received particle");
                     publish_goal_from_particle(&particle, &point_publisher, &stop_publisher)
                 }
                 Err(e) => {
@@ -341,6 +343,7 @@ fn publish_goal_from_particle(
             y: target[1],
             z: 0.0,
         };
+        eprintln!("Publishing goal {msg:?}");
         if let Err(e) = point_publisher.publish(&msg) {
             eprintln!("Error {e} when trying to publish {msg:?}");
         }
