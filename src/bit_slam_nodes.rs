@@ -2,7 +2,7 @@ use crate::{
     PERIOD,
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
-    util::{parse_obstacle_distance_heading, particle2rosgrid, pose_from_odometry},
+    util::{particle2rosgrid, pose_from_odometry},
 };
 use arg_vals::{ArgDocs, ArgVals};
 use chrono::Local;
@@ -121,10 +121,12 @@ impl RunnableNode for BitSlamNode {
         let particle_publisher = spec.publisher::<Ros2String>(&setup.particle_topic)?;
         let occupancy_grid_publisher =
             spec.publisher::<OccupancyGrid>(&setup.occupancy_grid_topic)?;
+        let status_publisher = spec.publisher::<Ros2String>(&setup.status_topic)?;
         let particle_data = Arc::new(Mutex::new(ParticleData {
             particle_filter,
             particle_publisher,
             occupancy_grid_publisher,
+            status_publisher,
             map_saved: false,
         }));
         setup.subscribe_obstacle(&mut spec, particle_data.clone())?;
@@ -149,6 +151,7 @@ struct ParticleData {
     particle_filter: ParticleFilter,
     particle_publisher: Publisher<Ros2String>,
     occupancy_grid_publisher: Publisher<OccupancyGrid>,
+    status_publisher: Publisher<Ros2String>,
     map_saved: bool,
 }
 
@@ -157,6 +160,7 @@ struct BitSlamSetup {
     occupancy_grid_topic: String,
     particle_topic: String,
     obstacle_topic: String,
+    status_topic: String,
     odom_topic: String,
     settings: ParticleFilterSettings,
     period: u64,
@@ -174,6 +178,7 @@ impl BitSlamSetup {
             occupancy_grid_topic: occupancy_grid_topic_name(&robot),
             particle_topic: particle_topic_name(&robot),
             obstacle_topic: obstacle_topic_name(&robot),
+            status_topic: status_topic_name(&robot),
             odom_topic: odom_topic_name(&robot),
             settings,
             period: args.get_value("-spin_time").unwrap_or(PERIOD),
@@ -221,10 +226,8 @@ fn publish_particle_obstacle(
     obst: &Ros2String,
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
-    let (distance, heading) = parse_obstacle_distance_heading(&obst.data)?;
-    particle_data
-        .particle_filter
-        .iterate(MapInput::Obstacle(distance, heading));
+    let map_input = obst.data.parse::<MapInput>()?;
+    particle_data.particle_filter.iterate(map_input);
     publish_particle(node, particle_data)?;
     Ok(())
 }
@@ -259,6 +262,18 @@ fn publish_particle(node: &Node, particle_data: &mut ParticleData) -> anyhow::Re
 
     let grid = particle2rosgrid(node, particle)?;
     particle_data.occupancy_grid_publisher.publish(&grid)?;
+
+    let msg = Ros2String {
+        data: (if failure.is_some() {
+            "Failed"
+        } else if particle_data.map_saved {
+            "Finished"
+        } else {
+            "Mapping"
+        })
+        .to_string(),
+    };
+    particle_data.status_publisher.publish(&msg)?;
     Ok(())
 }
 
@@ -357,13 +372,17 @@ fn publish_goal_from_particle(
 }
 
 pub fn obstacle_topic_name(robot: &str) -> String {
-    format!("{robot}_obstacles")
+    format!("{robot}_bitslam_obstacles")
 }
 
 pub fn particle_topic_name(robot: &str) -> String {
-    format!("{robot}_maps")
+    format!("{robot}_bitslam_maps")
 }
 
 pub fn occupancy_grid_topic_name(robot: &str) -> String {
-    format!("{robot}_occupancy_grid")
+    format!("{robot}_bitslam_occupancy_grid")
+}
+
+pub fn status_topic_name(robot: &str) -> String {
+    format!("{robot}_bitslam_status")
 }

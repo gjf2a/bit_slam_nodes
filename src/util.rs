@@ -1,5 +1,5 @@
 use particle_filter::{BitGridMap, Particle};
-use particle_filter::{angle::Radians, point::FloatPoint, pose::RobotPose};
+use particle_filter::{angle::Radians, pose::RobotPose};
 use r2r::geometry_msgs::msg::{Point as Ros2Point, Pose, Quaternion};
 use r2r::nav_msgs::msg::{MapMetaData, OccupancyGrid, Odometry};
 use r2r::{
@@ -8,11 +8,6 @@ use r2r::{
     geometry_msgs::msg::{Twist, TwistStamped, Vector3},
     std_msgs::msg::Header,
 };
-
-pub fn parse_obstacle_distance_heading(msg: &str) -> anyhow::Result<(f64, Radians)> {
-    let fp = msg.parse::<FloatPoint>()?;
-    Ok((fp[0], Radians::new(fp[1])))
-}
 
 pub fn find_yaw(value: &Odometry) -> Radians {
     find_roll_pitch_yaw(value).2
