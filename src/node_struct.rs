@@ -49,10 +49,19 @@ fn print_sub_pub(node: &Box<dyn RunnableNode>, args: &ArgVals) -> anyhow::Result
 
 pub trait RunnableNode {
     fn arg_docs(&self) -> &ArgDocs;
-    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()>;
+
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs;
+
     fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>>;
+
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>>;
+
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec>;
+
+    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
+        self.arg_docs_mut().set_default(param, param_default)
+    }
+
     fn run(&self) -> anyhow::Result<()> {
         let arg_docs = self.arg_docs();
         let args = arg_docs.get_args_with_defaults();

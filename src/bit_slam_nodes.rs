@@ -37,8 +37,8 @@ impl RunnableNode for BumpObstacleNode {
         &self.docs
     }
 
-    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
-        self.docs.set_default(param, param_default)
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
     }
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
@@ -78,7 +78,7 @@ fn publish_obstacle_location(
         let (distance, heading) = bump.obstacle_at();
         let heading: f64 = heading.into();
         let msg = Ros2String {
-            data: format!("({distance},{heading})"),
+            data: format!("(collision,{distance},{heading})"),
         };
         publisher.publish(&msg)?;
     }
@@ -110,8 +110,8 @@ impl RunnableNode for BitSlamNode {
         &self.docs
     }
 
-    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
-        self.docs.set_default(param, param_default)
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
     }
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
@@ -304,8 +304,8 @@ impl RunnableNode for BitSlamExplorerNode {
         &self.docs
     }
 
-    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
-        self.docs.set_default(param, param_default)
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
     }
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {

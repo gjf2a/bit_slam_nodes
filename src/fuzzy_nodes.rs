@@ -51,6 +51,10 @@ impl RunnableNode for GoalFuzzifierNode {
         &self.docs
     }
 
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
+    }
+
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let mut spec = NodeSpec::new(&format!("{robot}_goal_fuzzifier_node"), PERIOD)?;
@@ -93,10 +97,6 @@ impl RunnableNode for GoalFuzzifierNode {
             args.get_str_value("--reset-topic")?.clone(),
         ])
     }
-
-    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
-        self.docs.set_default(param, param_default)
-    }
 }
 
 fn publish_odom_fuzzy(
@@ -129,6 +129,10 @@ impl RunnableNode for DefuzzifyingErrorCorrectingNode {
         &self.docs
     }
 
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
+    }
+
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let mut spec = NodeSpec::new(&format!("{robot}_defuzz_error_node"), PERIOD)?;
@@ -151,10 +155,6 @@ impl RunnableNode for DefuzzifyingErrorCorrectingNode {
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = args.get_str_value("--robot")?;
         Ok(vec![fuzzified_goal_topic_name(robot)])
-    }
-
-    fn add_default(&mut self, param: &str, param_default: &str) -> anyhow::Result<()> {
-        self.docs.set_default(param, param_default)
     }
 }
 
