@@ -72,7 +72,7 @@ impl RunnableNode for BumpTurnNode {
         let last_angle = last_angle.clone();
         spec.subscribe(&subs[1], move |odom: Odometry, node| {
             let pose = pose_from_odometry(&odom);
-            eprintln!("At {pose}");
+            eprintln!("At {pose}; last angle was {:?}", last_angle.load());
             if let Some(last_angle) = last_angle.load() {
                 if let Err(e) = bump_turn_move(pose.theta, last_angle, turn_remaining.clone(), node, odom_mode.clone(), &publisher) {
                     eprintln!("Error {e} from bump_turn_move()");
@@ -93,6 +93,8 @@ fn bump_turn_move(msg_angle: Radians, last_angle: Radians, turn_remaining: Arc<A
                 turn_remaining_radians -= last_diff.abs();
                 if f64::from(turn_remaining_radians) < 0.0 {
                     turn_remaining.store(None);
+                } else {
+                    turn_remaining.store(Some(turn_remaining_radians));
                 }
                 (0.0, 1.0)
             }
