@@ -131,6 +131,7 @@ impl RunnableNode for BitSlamNode {
         }));
         setup.subscribe_obstacle(&mut spec, particle_data.clone())?;
         setup.subscribe_odometry(&mut spec, particle_data.clone())?;
+        setup.subscribe_save(&mut spec, particle_data)?;
         Ok(spec)
     }
 
@@ -143,7 +144,7 @@ impl RunnableNode for BitSlamNode {
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = robot_name!(args);
-        Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot)])
+        Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot), save_topic_name(robot)])
     }
 }
 
@@ -155,6 +156,16 @@ struct ParticleData {
     map_saved: bool,
 }
 
+impl ParticleData {
+    fn save(&self) -> anyhow::Result<()> {
+        let json = serde_json::to_string(&self.particle_filter)?;
+        let now = Local::now();
+        let output_filename = format!("bit_slam_{}.json", now.format("%Y_%m_%d_%H_%M_%S"));
+        std::fs::write(output_filename, json)?;
+        Ok(())
+    }
+}
+
 struct BitSlamSetup {
     node_name: String,
     occupancy_grid_topic: String,
@@ -162,6 +173,7 @@ struct BitSlamSetup {
     obstacle_topic: String,
     status_topic: String,
     odom_topic: String,
+    save_topic: String,
     settings: ParticleFilterSettings,
     period: u64,
 }
@@ -180,6 +192,7 @@ impl BitSlamSetup {
             obstacle_topic: obstacle_topic_name(&robot),
             status_topic: status_topic_name(&robot),
             odom_topic: odom_topic_name(&robot),
+            save_topic: save_topic_name(&robot),
             settings,
             period: args.get_value("-spin_time").unwrap_or(PERIOD),
         })
@@ -219,6 +232,15 @@ impl BitSlamSetup {
             }
         })
     }
+
+    fn subscribe_save(&self, spec: &mut NodeSpec, particle_data: Arc<Mutex<ParticleData>>) -> anyhow::Result<()> {
+        spec.subscribe(&self.save_topic, move |_: Ros2String, _| {
+            let particle_data = smol::block_on(particle_data.lock());
+            if let Err(e) = particle_data.save() {
+                eprintln!("Error {e} when saving particle filter.");
+            }
+        })
+    }
 }
 
 fn publish_particle_obstacle(
@@ -250,10 +272,7 @@ fn publish_particle(node: &Node, particle_data: &mut ParticleData) -> anyhow::Re
         Some(failure) => failure,
     };
     if !particle_data.map_saved && PathsBackTo::done(&particle) {
-        let json = serde_json::to_string(&particle_data.particle_filter)?;
-        let now = Local::now();
-        let output_filename = format!("bit_slam_{}.json", now.format("%Y_%m_%d_%H_%M_%S"));
-        std::fs::write(output_filename, json)?;
+        particle_data.save()?;
         particle_data.map_saved = true;
     }
     let data = serde_json::to_string(particle)?;
@@ -385,4 +404,8 @@ pub fn occupancy_grid_topic_name(robot: &str) -> String {
 
 pub fn status_topic_name(robot: &str) -> String {
     format!("{robot}_bitslam_status")
+}
+
+pub fn save_topic_name(robot: &str) -> String {
+    format!("{robot}_save_bitslam")
 }
