@@ -105,5 +105,6 @@ fn bump_turn_move(msg_angle: Radians, last_angle: Radians, turn_remaining: Arc<A
         }
     };
     publisher.publish(&twist_stamped(node, x, z)?)?;
+    eprintln!("published x: {x} z: {z}");
     Ok(())
 }
