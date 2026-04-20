@@ -64,7 +64,7 @@ impl RunnableNode for BumpTurnNode {
         let tr = turn_remaining.clone();
         spec.subscribe(&subs[0], move |_obstacle: Ros2String, _| {
             ob_mode.store(BumpTurnMode::Turn);
-            tr.store(Some(Radians::new(PI * 5.0 / 8.0)));
+            tr.store(Some(Radians::new(PI * 1.0 / 8.0)));
         })?;
 
         let odom_mode = mode.clone();
