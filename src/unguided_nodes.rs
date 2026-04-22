@@ -157,6 +157,8 @@ struct IrHazardStatus {
     ir_max: i16,
     max_ir_history: AllocRingBuffer<i16>,
     mode: AvoidMode,
+    pending_turn: f64,
+    turn_coefficient: f64,
 }
 
 impl IrHazardStatus {
@@ -165,6 +167,8 @@ impl IrHazardStatus {
             ir_max: args.get_value("--starting-ir-max")?,
             max_ir_history: AllocRingBuffer::new(args.get_value("--history-window")?),
             mode: AvoidMode::Forward,
+            pending_turn: 1.0,
+            turn_coefficient: 1.0,
         })
     }
 
@@ -173,9 +177,11 @@ impl IrHazardStatus {
             if frame_id.starts_with("bump") {
                 if let Some(min_max_ir) = self.max_ir_history.iter().min().copied() {
                     self.ir_max = min_max_ir;
+                    eprintln!("ir_max is now: {}", self.ir_max);
                 }
             }
             self.mode = AvoidMode::Turn;
+            self.turn_coefficient = self.pending_turn;
         }
     }
 
@@ -186,14 +192,16 @@ impl IrHazardStatus {
         publisher: &Publisher<TwistStamped>,
     ) -> anyhow::Result<()> {
         let current_max = ir.readings.iter().map(|i| i.value).max().unwrap();
+        self.pending_turn = turn_coefficient(&ir);
         self.mode = if current_max >= self.ir_max {
+            self.turn_coefficient = self.pending_turn;
             AvoidMode::Turn
         } else {
             AvoidMode::Forward
         };
         let (x, z) = match self.mode {
             AvoidMode::Forward => (0.5, 0.0),
-            AvoidMode::Turn => (0.0, turn_coefficient(&ir)),
+            AvoidMode::Turn => (0.0, self.turn_coefficient),
         };
         publisher.publish(&twist_stamped(node, x, z)?)?;
         self.max_ir_history.enqueue(current_max);
