@@ -1,4 +1,4 @@
-use std::{f64::consts::PI, sync::Arc};
+use std::{cmp::max, f64::consts::PI, sync::Arc};
 
 use arg_vals::{ArgDocs, ArgVals};
 
@@ -147,6 +147,7 @@ impl Default for IrHazardDataNode {
                     ("--robot", "str", ""),
                     ("--history-window", "usize", "5"),
                     ("--starting-ir-max", "i16", "200"),
+                    ("--ir-min", "i16", "10"),
                 ],
             ),
         }
@@ -155,6 +156,7 @@ impl Default for IrHazardDataNode {
 
 struct IrHazardStatus {
     ir_max: i16,
+    ir_max_min: i16,
     max_ir_history: AllocRingBuffer<i16>,
     mode: AvoidMode,
     pending_turn: f64,
@@ -163,8 +165,11 @@ struct IrHazardStatus {
 
 impl IrHazardStatus {
     fn new(args: &ArgVals) -> anyhow::Result<Self> {
+        let ir_max_min = args.get_value("--ir-max-min")?;
+        let ir_max = max(ir_max_min, args.get_value("--starting-ir-max")?);
         Ok(Self {
-            ir_max: args.get_value("--starting-ir-max")?,
+            ir_max,
+            ir_max_min,
             max_ir_history: AllocRingBuffer::new(args.get_value("--history-window")?),
             mode: AvoidMode::Forward,
             pending_turn: 1.0,
@@ -176,7 +181,7 @@ impl IrHazardStatus {
         for (frame_id, _) in hazards_from(&hazards) {
             if frame_id.starts_with("bump") {
                 if let Some(min_max_ir) = self.max_ir_history.iter().min().copied() {
-                    self.ir_max = min_max_ir;
+                    self.ir_max = max(self.ir_max_min, min_max_ir);
                     eprintln!("ir_max is now: {}", self.ir_max);
                 }
             }
