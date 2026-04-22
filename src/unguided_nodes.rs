@@ -194,7 +194,9 @@ impl IrHazardStatus {
         let current_max = ir.readings.iter().map(|i| i.value).max().unwrap();
         self.pending_turn = turn_coefficient(&ir);
         self.mode = if current_max >= self.ir_max {
-            self.turn_coefficient = self.pending_turn;
+            if self.mode == AvoidMode::Forward {
+                self.turn_coefficient = self.pending_turn;
+            }
             AvoidMode::Turn
         } else {
             AvoidMode::Forward
@@ -203,8 +205,8 @@ impl IrHazardStatus {
             AvoidMode::Forward => (0.5, 0.0),
             AvoidMode::Turn => (0.0, self.turn_coefficient),
         };
-        publisher.publish(&twist_stamped(node, x, z)?)?;
         self.max_ir_history.enqueue(current_max);
+        publisher.publish(&twist_stamped(node, x, z)?)?;
         Ok(())
     }
 }
