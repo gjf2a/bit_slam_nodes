@@ -147,7 +147,7 @@ impl Default for IrHazardDataNode {
                     ("--robot", "str", ""),
                     ("--history-window", "usize", "5"),
                     ("--starting-ir-max", "i16", "200"),
-                    ("--ir-min", "i16", "10"),
+                    ("--ir-max-min", "i16", "10"),
                 ],
             ),
         }
