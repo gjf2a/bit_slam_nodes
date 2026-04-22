@@ -257,7 +257,7 @@ impl RunnableNode for IrHazardDataNode {
                 }
             }
         })?;
-        todo!();
+        Ok(spec)
     }
 }
 
