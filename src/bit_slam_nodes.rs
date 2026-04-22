@@ -2,10 +2,9 @@ use crate::{
     PERIOD,
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
-    util::{particle2rosgrid, pose_from_odometry},
+    util::{particle2rosgrid, pose_from_odometry, timestamped_filename},
 };
 use arg_vals::{ArgDocs, ArgVals};
-use chrono::Local;
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump,
     path_plan::PathsBackTo,
@@ -48,12 +47,9 @@ impl RunnableNode for BumpObstacleNode {
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
-            for detection in hazards.detections {
-                if let Err(e) = publish_obstacle_location(&publisher, &detection.header.frame_id) {
-                    eprintln!(
-                        "Error {e} when trying to publish hazard {}",
-                        detection.header.frame_id
-                    );
+            for (frame_id, bump) in hazards_from(&hazards) {
+                if let Err(e) = publish_obstacle_location(&publisher, &bump) {
+                    eprintln!("Error {e} when trying to publish hazard {frame_id}.");
                 }
             }
         })?;
@@ -70,18 +66,23 @@ impl RunnableNode for BumpObstacleNode {
     }
 }
 
-fn publish_obstacle_location(
-    publisher: &Publisher<Ros2String>,
-    frame_id: &str,
-) -> anyhow::Result<()> {
-    if let Ok(bump) = frame_id.parse::<Bump>() {
-        let (distance, heading) = bump.obstacle_at();
-        let heading: f64 = heading.into();
-        let msg = Ros2String {
-            data: format!("(collision,{distance},{heading})"),
-        };
-        publisher.publish(&msg)?;
-    }
+pub fn hazards_from(hazards: &HazardDetectionVector) -> impl Iterator<Item = (String, Bump)> {
+    hazards.detections.iter().filter_map(|h| {
+        h.header
+            .frame_id
+            .parse::<Bump>()
+            .ok()
+            .map(|b| (h.header.frame_id.clone(), b))
+    })
+}
+
+fn publish_obstacle_location(publisher: &Publisher<Ros2String>, bump: &Bump) -> anyhow::Result<()> {
+    let (distance, heading) = bump.obstacle_at();
+    let heading: f64 = heading.into();
+    let msg = Ros2String {
+        data: format!("(collision,{distance},{heading})"),
+    };
+    publisher.publish(&msg)?;
     Ok(())
 }
 
@@ -144,7 +145,11 @@ impl RunnableNode for BitSlamNode {
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = robot_name!(args);
-        Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot), save_topic_name(robot)])
+        Ok(vec![
+            obstacle_topic_name(robot),
+            odom_topic_name(robot),
+            save_topic_name(robot),
+        ])
     }
 }
 
@@ -159,8 +164,7 @@ struct ParticleData {
 impl ParticleData {
     fn save(&self) -> anyhow::Result<()> {
         let json = serde_json::to_string(&self.particle_filter)?;
-        let now = Local::now();
-        let output_filename = format!("bit_slam_{}.json", now.format("%Y_%m_%d_%H_%M_%S"));
+        let output_filename = timestamped_filename("bit_slam");
         std::fs::write(output_filename, json)?;
         Ok(())
     }
@@ -233,7 +237,11 @@ impl BitSlamSetup {
         })
     }
 
-    fn subscribe_save(&self, spec: &mut NodeSpec, particle_data: Arc<Mutex<ParticleData>>) -> anyhow::Result<()> {
+    fn subscribe_save(
+        &self,
+        spec: &mut NodeSpec,
+        particle_data: Arc<Mutex<ParticleData>>,
+    ) -> anyhow::Result<()> {
         spec.subscribe(&self.save_topic, move |_: Ros2String, _| {
             let particle_data = smol::block_on(particle_data.lock());
             if let Err(e) = particle_data.save() {

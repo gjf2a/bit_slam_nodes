@@ -1,3 +1,4 @@
+use chrono::Local;
 use particle_filter::{BitGridMap, Particle};
 use particle_filter::{angle::Radians, pose::RobotPose};
 use r2r::geometry_msgs::msg::{Point as Ros2Point, Pose, Quaternion};
@@ -8,6 +9,11 @@ use r2r::{
     geometry_msgs::msg::{Twist, TwistStamped, Vector3},
     std_msgs::msg::Header,
 };
+
+pub fn timestamped_filename(prefix: &str) -> String {
+    let now = Local::now();
+    format!("{prefix}_{}.json", now.format("%Y_%m_%d_%H_%M_%S"))
+}
 
 pub fn find_yaw(value: &Odometry) -> Radians {
     find_roll_pitch_yaw(value).2
