@@ -2,7 +2,6 @@ use std::{cmp::max, f64::consts::PI, sync::Arc};
 
 use arg_vals::{ArgDocs, ArgVals};
 
-use crossbeam::atomic::AtomicCell;
 use particle_filter::angle::Radians;
 use r2r::{
     Node, Publisher,
@@ -34,10 +33,59 @@ impl Default for BumpTurnNode {
     }
 }
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
 enum AvoidMode {
+    #[default]
     Forward,
     Turn,
+}
+
+#[derive(Copy, Clone, Default, Debug)]
+struct BumpTurnStatus {
+    mode: AvoidMode,
+    turn_remaining: Option<Radians>,
+    last_angle: Option<Radians>,
+}
+
+impl BumpTurnStatus {
+    fn bump_turn_move(
+        &mut self,
+        msg_angle: Radians,
+        node: &Node,
+        publisher: &Publisher<TwistStamped>,
+    ) -> anyhow::Result<()> {
+        if let Some((x, z)) = match self.mode {
+            AvoidMode::Forward => Some((0.5, 0.0)),
+            AvoidMode::Turn => self.turn(msg_angle),
+        } {
+            publisher.publish(&twist_stamped(node, x, z)?)?;
+        }
+        self.last_angle = Some(msg_angle);
+        Ok(())
+    }
+
+    fn turn(&mut self, msg_angle: Radians) -> Option<(f64, f64)> {
+        if let Some(last_angle) = self.last_angle {
+            match self.turn_remaining.as_mut() {
+                Some(turn_remaining_radians) => {
+                    let last_diff = last_angle - msg_angle;
+                    *turn_remaining_radians -= last_diff.abs();
+                    self.turn_remaining = if f64::from(*turn_remaining_radians) < 0.0 {
+                        None
+                    } else {
+                        Some(*turn_remaining_radians)
+                    };
+                    Some((0.0, 1.0))
+                }
+                None => {
+                    self.mode = AvoidMode::Forward;
+                    Some((0.5, 0.0))
+                }
+            }
+        } else {
+            None
+        }
+    }
 }
 
 impl RunnableNode for BumpTurnNode {
@@ -64,74 +112,27 @@ impl RunnableNode for BumpTurnNode {
         let mut spec = NodeSpec::new(format!("{robot}_bump_turn_node").as_str(), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
-        let mode = Arc::new(AtomicCell::new(AvoidMode::Forward));
-        let turn_remaining = Arc::new(AtomicCell::new(None));
-        let last_angle = Arc::new(AtomicCell::new(None));
+
+        let status = Arc::new(Mutex::new(BumpTurnStatus::default()));
         let publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
 
-        let bump_mode = mode.clone();
-        let tr = turn_remaining.clone();
+        let obstacle_status = status.clone();
         spec.subscribe(&subs[0], move |_obstacle: Ros2String, _| {
-            bump_mode
-                .compare_exchange(AvoidMode::Forward, AvoidMode::Turn)
-                .ok();
-            tr.store(Some(Radians::new(PI * 1.0 / 8.0)));
+            let mut obstacle_status = smol::block_on(obstacle_status.lock());
+            obstacle_status.mode = AvoidMode::Turn;
+            obstacle_status.turn_remaining = Some(Radians::new(PI * 1.0 / 8.0));
         })?;
 
-        let odom_mode = mode.clone();
-        let turn_remaining = turn_remaining.clone();
-        let last_angle = last_angle.clone();
         spec.subscribe(&subs[1], move |odom: Odometry, node| {
             let pose = pose_from_odometry(&odom);
-            eprintln!("At {pose}; last angle was {:?}", last_angle.load());
-            if let Some(last_angle) = last_angle.load() {
-                if let Err(e) = bump_turn_move(
-                    pose.theta,
-                    last_angle,
-                    turn_remaining.clone(),
-                    node,
-                    odom_mode.clone(),
-                    &publisher,
-                ) {
+            if let Some(mut status) = status.try_lock() {
+                if let Err(e) = status.bump_turn_move(pose.theta, node, &publisher) {
                     eprintln!("Error {e} from bump_turn_move()");
                 }
             }
-            last_angle.store(Some(pose.theta))
         })?;
         Ok(spec)
     }
-}
-
-fn bump_turn_move(
-    msg_angle: Radians,
-    last_angle: Radians,
-    turn_remaining: Arc<AtomicCell<Option<Radians>>>,
-    node: &Node,
-    odom_mode: Arc<AtomicCell<AvoidMode>>,
-    publisher: &Publisher<TwistStamped>,
-) -> anyhow::Result<()> {
-    let (x, z) = match odom_mode.load() {
-        AvoidMode::Forward => (0.5, 0.0),
-        AvoidMode::Turn => match turn_remaining.load() {
-            Some(mut turn_remaining_radians) => {
-                let last_diff = last_angle - msg_angle;
-                turn_remaining_radians -= last_diff.abs();
-                if f64::from(turn_remaining_radians) < 0.0 {
-                    turn_remaining.store(None);
-                } else {
-                    turn_remaining.store(Some(turn_remaining_radians));
-                }
-                (0.0, 1.0)
-            }
-            None => {
-                odom_mode.store(AvoidMode::Forward);
-                (0.5, 0.0)
-            }
-        },
-    };
-    publisher.publish(&twist_stamped(node, x, z)?)?;
-    eprintln!("published x: {x} z: {z}");
-    Ok(())
 }
 
 pub struct IrHazardDataNode {
