@@ -48,7 +48,8 @@ struct BumpTurnStatus {
 }
 
 impl BumpTurnStatus {
-    fn bump_turn_move(&mut self, 
+    fn bump_turn_move(
+        &mut self,
         msg_angle: Radians,
         node: &Node,
         publisher: &Publisher<TwistStamped>,
@@ -58,7 +59,7 @@ impl BumpTurnStatus {
             AvoidMode::Turn => self.turn(msg_angle),
         } {
             publisher.publish(&twist_stamped(node, x, z)?)?;
-        }           
+        }
         self.last_angle = Some(msg_angle);
         Ok(())
     }
