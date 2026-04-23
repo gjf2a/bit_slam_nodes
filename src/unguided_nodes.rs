@@ -53,33 +53,36 @@ impl BumpTurnStatus {
         node: &Node,
         publisher: &Publisher<TwistStamped>,
     ) -> anyhow::Result<()> {
-        if let Some(last_angle) = self.last_angle {
-            let (x, z) = match self.mode {
-                AvoidMode::Forward => (0.5, 0.0),
-                AvoidMode::Turn => self.turn(last_angle, msg_angle),
-            };
+        if let Some((x, z)) = match self.mode {
+            AvoidMode::Forward => Some((0.5, 0.0)),
+            AvoidMode::Turn => self.turn(msg_angle),
+        } {
             publisher.publish(&twist_stamped(node, x, z)?)?;
-            eprintln!("published x: {x} z: {z}");
-        }
+        }           
+        self.last_angle = Some(msg_angle);
         Ok(())
     }
 
-    fn turn(&mut self, last_angle: Radians, msg_angle: Radians) -> (f64, f64) {
-        match self.turn_remaining.as_mut() {
-            Some(turn_remaining_radians) => {
-                let last_diff = last_angle - msg_angle;
-                *turn_remaining_radians -= last_diff.abs();
-                self.turn_remaining = if f64::from(*turn_remaining_radians) < 0.0 {
-                    None
-                } else {
-                    Some(turn_remaining_radians.clone())
-                };
-                (0.0, 1.0)
+    fn turn(&mut self, msg_angle: Radians) -> Option<(f64, f64)> {
+        if let Some(last_angle) = self.last_angle {
+            match self.turn_remaining.as_mut() {
+                Some(turn_remaining_radians) => {
+                    let last_diff = last_angle - msg_angle;
+                    *turn_remaining_radians -= last_diff.abs();
+                    self.turn_remaining = if f64::from(*turn_remaining_radians) < 0.0 {
+                        None
+                    } else {
+                        Some(*turn_remaining_radians)
+                    };
+                    Some((0.0, 1.0))
+                }
+                None => {
+                    self.mode = AvoidMode::Forward;
+                    Some((0.5, 0.0))
+                }
             }
-            None => {
-                self.mode = AvoidMode::Forward;
-                (0.5, 0.0)
-            }
+        } else {
+            None
         }
     }
 }
@@ -120,13 +123,11 @@ impl RunnableNode for BumpTurnNode {
         })?;
 
         spec.subscribe(&subs[1], move |odom: Odometry, node| {
+            let pose = pose_from_odometry(&odom);
             if let Some(mut status) = status.try_lock() {
-                let pose = pose_from_odometry(&odom);
-                eprintln!("At {pose}; last angle was {:?}", status.last_angle);
                 if let Err(e) = status.bump_turn_move(pose.theta, node, &publisher) {
                     eprintln!("Error {e} from bump_turn_move()");
                 }
-                status.last_angle = Some(pose.theta);
             }
         })?;
         Ok(spec)
