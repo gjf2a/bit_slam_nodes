@@ -2,7 +2,7 @@ use std::{cmp::max, f64::consts::PI, sync::Arc};
 
 use arg_vals::{ArgDocs, ArgVals};
 
-use particle_filter::angle::Radians;
+use particle_filter::{angle::Radians, MapInput};
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::TwistStamped,
@@ -28,7 +28,7 @@ pub struct BumpTurnNode {
 impl Default for BumpTurnNode {
     fn default() -> Self {
         Self {
-            docs: ArgDocs::new("bump_turn_node", &vec![("--robot", "str", "")]),
+            docs: ArgDocs::new("bump_turn_node", &vec![("--robot", "str", ""), ("--turn-distance", "f64", "0.5")]),
         }
     }
 }
@@ -109,6 +109,7 @@ impl RunnableNode for BumpTurnNode {
 
     fn spec(&self, args: &arg_vals::ArgVals) -> anyhow::Result<crate::node_struct::NodeSpec> {
         let robot = args.get_str_value("--robot")?;
+        let avoid_distance: f64 = args.get_value("--turn-distance")?;
         let mut spec = NodeSpec::new(format!("{robot}_bump_turn_node").as_str(), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
@@ -117,10 +118,20 @@ impl RunnableNode for BumpTurnNode {
         let publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
 
         let obstacle_status = status.clone();
-        spec.subscribe(&subs[0], move |_obstacle: Ros2String, _| {
-            let mut obstacle_status = smol::block_on(obstacle_status.lock());
-            obstacle_status.mode = AvoidMode::Turn;
-            obstacle_status.turn_remaining = Some(Radians::new(PI * 1.0 / 8.0));
+        spec.subscribe(&subs[0], move |obstacle: Ros2String, _| {
+            if let Ok(map_input) = obstacle.data.parse::<MapInput>() {
+                let turn = match map_input {
+                    MapInput::Pose(_) => false,
+                    MapInput::Collision(_, _) => true,
+                    MapInput::RangeObject(distance, _) => distance < avoid_distance,
+                };
+
+                if turn {
+                    let mut obstacle_status = smol::block_on(obstacle_status.lock());
+                    obstacle_status.mode = AvoidMode::Turn;
+                    obstacle_status.turn_remaining = Some(Radians::new(PI * 1.0 / 8.0));
+                }
+            }
         })?;
 
         spec.subscribe(&subs[1], move |odom: Odometry, node| {
