@@ -3,9 +3,7 @@
 # Documentation: https://qwiic-vl53l1x-py.readthedocs.io/en/latest/apiref.html
 
 import qwiic_vl53l1x
-import time
 import sys
-import math
 
 import rclpy
 from rclpy.node import Node
