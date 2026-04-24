@@ -13,5 +13,6 @@ ctrlc = "3.5.2"
 serde_json = "1.0.149"
 chrono = "0.4.44"
 serde = {version = "1.0.228", features = ["derive"]}
+ringbuffer = "0.16.0"
 arg_vals = {git = "https://github.com/gjf2a/arg_vals"}
 particle_filter = {git = "https://github.com/gjf2a/particle_filter"}
