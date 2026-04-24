@@ -15,6 +15,7 @@ use r2r::{
     geometry_msgs::msg::Point as Ros2Point,
     irobot_create_msgs::msg::HazardDetectionVector,
     nav_msgs::msg::{OccupancyGrid, Odometry},
+    sensor_msgs::msg::LaserScan,
     std_msgs::msg::String as Ros2String,
 };
 use smol::lock::Mutex;
@@ -84,6 +85,67 @@ fn publish_obstacle_location(
     }
     Ok(())
 }
+
+pub struct ScanObstacleNode {
+    docs: ArgDocs,
+}
+
+impl Default for ScanObstacleNode {
+    fn default() -> Self {
+        Self {
+            docs: ArgDocs::new("scan_obstacle_node", &vec![("--robot", "str", "")]),
+        }
+    }
+}
+
+impl RunnableNode for ScanObstacleNode {
+    fn arg_docs(&self) -> &ArgDocs {
+        &self.docs
+    }
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
+    }
+    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(format!("{robot}_obstacle_node").as_str(), PERIOD)?;   
+        let subs = self.subscribing_topics(args)?;
+        let pubs = self.publishing_topics(args)?;
+        let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
+        let obstacle_threshold = 3.0;
+        spec.subscribe(&subs[0], move |scan: LaserScan, _| {
+            for (i, &range) in scan.ranges.iter().enumerate() {
+                if range > scan.range_min && range < obstacle_threshold {
+                    let heading = scan.angle_min + (i as f32 * scan.angle_increment);
+                    if let Err(e) = publish_scan_obstacle_location(&publisher, range, heading) {
+                        eprintln!("Error {e} when trying to publish scan obstacle");
+                    }
+                    break;
+                }
+            }
+        })?;
+        Ok(spec)
+    }
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        Ok(vec![obstacle_topic_name(robot_name!(args))])
+    }
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = robot_name!(args);
+        Ok(vec![format!("{robot}/scan")])
+    }
+}
+
+fn publish_scan_obstacle_location(
+    publisher: &Publisher<Ros2String>,
+    distance: f32,
+    heading: f32,
+) -> anyhow::Result<()> {
+    let msg = Ros2String {
+        data: format!("(object,{distance},{heading})"),
+    };
+    publisher.publish(&msg)?;
+    Ok(())
+}
+
 
 pub struct BitSlamNode {
     docs: ArgDocs,

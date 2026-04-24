@@ -92,7 +92,7 @@ fn map_meta_data(header: &Header, map: &BitGridMap) -> MapMetaData {
                 x: 0.0,
                 y: 0.0,
                 z: 0.0,
-                w: 0.0,
+                w: 1.0,
             },
         },
     }
