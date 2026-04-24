@@ -12,20 +12,6 @@ from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import String
 from rclpy.executors import MultiThreadedExecutor
-from irobot_create_msgs.msg import HazardDetectionVector
-
-offsets = {
-    'bump_front_center': 0.0,
-    'cliff_front_center': 0.0,
-    'bump_front_left': math.pi / 4.0,
-    'cliff_front_left': math.pi / 4.0,
-    'bump_front_right': -math.pi / 4.0,
-    'cliff_front_right': -math.pi / 4.0,
-    'bump_left': math.pi / 2.0,
-    'cliff_side_left': math.pi / 2.0,
-    'bump_right': -math.pi / 2.0,
-    'cliff_side_right': -math.pi / 2.0
-}
 
 
 class TimeOfFlightNode(Node):
@@ -33,7 +19,6 @@ class TimeOfFlightNode(Node):
         super().__init__(f"TimeOfFlightNode_{robot_name}")
         self.max_object_distance = max_object_distance
         tof_topic = f"{robot_name}_bitslam_obstacles"
-        self.hazards = self.create_subscription(HazardDetectionVector, f"/{robot_name}/hazard_detection", self.hazard_callback, qos_profile_sensor_data)
         self.pub = self.create_publisher(String, tof_topic, qos_profile_sensor_data)
         print(f"Publishing on {tof_topic}")
         self.timer = self.create_timer(delay, self.timer_callback)
@@ -45,20 +30,11 @@ class TimeOfFlightNode(Node):
     def timer_callback(self):
         if self.tof.check_for_data_ready():
             distance = self.tof.get_distance()
-            if self.max_object_distance is None or distance < self.max_object_distance:
+            if distance > 0 and (self.max_object_distance is None or distance < self.max_object_distance):
                 output = String()
                 output.data = f"(object,{distance/1000},0.0)"
                 self.pub.publish(output)
             self.tof.clear_interrupt()
-
-    def hazard_callback(self, msg: HazardDetectionVector):
-        for d in msg.detections:
-            name = d.header.frame_id
-            if name in offsets:
-                output = String()
-                output.data = f"(collision,0.2032,{offsets[name]})"
-                self.pub.publish(output)
-                break
 
 
 def extract_args(values: dict[str,any]):
