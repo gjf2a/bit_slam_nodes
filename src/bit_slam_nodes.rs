@@ -2,7 +2,7 @@ use crate::{
     PERIOD,
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
-    util::{particle2rosgrid, pose_from_odometry, timestamped_filename},
+    util::{particle2rosgrid, pose_from_odometry, ros2_name, timestamped_filename},
 };
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
@@ -43,7 +43,7 @@ impl RunnableNode for BumpObstacleNode {
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(format!("{robot}_obstacle_node").as_str(), PERIOD)?;
+        let mut spec = NodeSpec::new(&ros2_name(robot, "obstacle_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
@@ -108,7 +108,7 @@ impl RunnableNode for ScanObstacleNode {
     }
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(format!("{robot}_obstacle_node").as_str(), PERIOD)?;   
+        let mut spec = NodeSpec::new(&ros2_name(robot, "obstacle_node"), PERIOD)?;   
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
@@ -252,7 +252,7 @@ impl BitSlamSetup {
         settings.square_size_m = args.get_value("--meters-per-cell")?;
         settings.save_inputs = args.get_value("--save-map")?;
         Ok(Self {
-            node_name: format!("{robot}_bitslam_node"),
+            node_name: ros2_name(&robot, "bitslam_node"),
             occupancy_grid_topic: occupancy_grid_topic_name(&robot),
             particle_topic: particle_topic_name(&robot),
             obstacle_topic: obstacle_topic_name(&robot),
@@ -372,11 +372,11 @@ pub struct BitSlamExplorerNode {
 
 impl BitSlamExplorerNode {
     pub fn goal_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
-        Ok(format!("{}_bitslam_explorer_goal", robot_name!(args)))
+        Ok(ros2_name(robot_name!(args), "bitslam_explorer_goal"))
     }
 
     pub fn stop_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
-        Ok(format!("{}_bitslam_explorer_stop", robot_name!(args)))
+        Ok(ros2_name(robot_name!(args), "bitslam_explorer_stop"))
     }
 }
 
@@ -399,7 +399,7 @@ impl RunnableNode for BitSlamExplorerNode {
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&format!("{robot}_explorer_node"), PERIOD)?;
+        let mut spec = NodeSpec::new(&ros2_name(robot, "explorer_node"), PERIOD)?;
         let pubs = self.publishing_topics(args)?;
         let point_publisher = spec.publisher::<Ros2Point>(&pubs[0])?;
         let stop_publisher = spec.publisher::<Ros2String>(&pubs[1])?;
@@ -461,21 +461,21 @@ fn publish_goal_from_particle(
 }
 
 pub fn obstacle_topic_name(robot: &str) -> String {
-    format!("{robot}_bitslam_obstacles")
+    ros2_name(robot, "bitslam_obstacles")
 }
 
 pub fn particle_topic_name(robot: &str) -> String {
-    format!("{robot}_bitslam_maps")
+    ros2_name(robot, "bitslam_maps")
 }
 
 pub fn occupancy_grid_topic_name(robot: &str) -> String {
-    format!("{robot}_bitslam_occupancy_grid")
+    ros2_name(robot, "bitslam_occupancy_grid")
 }
 
 pub fn status_topic_name(robot: &str) -> String {
-    format!("{robot}_bitslam_status")
+    ros2_name(robot, "bitslam_status")
 }
 
 pub fn save_topic_name(robot: &str) -> String {
-    format!("{robot}_save_bitslam")
+    ros2_name(robot, "save_bitslam")
 }

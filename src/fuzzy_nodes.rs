@@ -5,7 +5,7 @@ use crate::{
     fuzzy::{FuzzySet, FuzzyVar},
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name,
-    util::{find_yaw, twist_stamped},
+    util::{find_yaw, ros2_name, twist_stamped},
 };
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{angle::Radians, point::FloatPoint, pt};
@@ -24,7 +24,7 @@ const X_LIMIT: f64 = 0.5;
 const Z_LIMIT: f64 = 1.0;
 
 pub fn fuzzified_goal_topic_name(robot_name: &str) -> String {
-    format!("{robot_name}_goal_error")
+    ros2_name(robot_name, "goal_error")
 }
 
 pub struct GoalFuzzifierNode {
@@ -57,7 +57,7 @@ impl RunnableNode for GoalFuzzifierNode {
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&format!("{robot}_goal_fuzzifier_node"), PERIOD)?;
+        let mut spec = NodeSpec::new(&ros2_name(robot, "goal_fuzzifier_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
@@ -135,7 +135,7 @@ impl RunnableNode for DefuzzifyingErrorCorrectingNode {
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&format!("{robot}_defuzz_error_node"), PERIOD)?;
+        let mut spec = NodeSpec::new(&ros2_name(robot, "defuzz_error_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
