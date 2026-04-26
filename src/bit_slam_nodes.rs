@@ -319,7 +319,7 @@ fn publish_particle_obstacle(
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
     let map_input = obst.data.parse::<MapInput>()?;
-    particle_data.particle_filter.iterate(map_input);
+    particle_data.particle_filter.iterate(map_input, true);
     publish_particle(node, particle_data)?;
     Ok(())
 }
@@ -330,7 +330,7 @@ fn publish_particle_odom(
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
     let pose = pose_from_odometry(&odom);
-    particle_data.particle_filter.iterate(MapInput::Pose(pose));
+    particle_data.particle_filter.iterate(MapInput::Pose(pose), true);
     publish_particle(node, particle_data)?;
     Ok(())
 }
