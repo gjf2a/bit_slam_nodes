@@ -18,7 +18,7 @@ use r2r::{
     std_msgs::msg::String as Ros2String,
 };
 use smol::lock::Mutex;
-use std::sync::Arc;
+use std::{f64::consts::PI, sync::Arc};
 
 pub struct BumpObstacleNode {
     docs: ArgDocs,
@@ -78,10 +78,9 @@ pub fn hazards_from(hazards: &HazardDetectionVector) -> impl Iterator<Item = (St
 }
 
 fn publish_obstacle_location(publisher: &Publisher<Ros2String>, bump: &Bump) -> anyhow::Result<()> {
-    let (distance, heading) = bump.obstacle_at();
-    let heading: f64 = heading.into();
+    let obstacle = bump.obstacle_at();
     let msg = Ros2String {
-        data: format!("(collision,{distance},{heading})"),
+        data: format!("{obstacle}"),
     };
     publisher.publish(&msg)?;
     Ok(())
@@ -108,7 +107,7 @@ impl RunnableNode for ScanObstacleNode {
     }
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
-        let mut spec = NodeSpec::new(&ros2_name(robot, "obstacle_node"), PERIOD)?;   
+        let mut spec = NodeSpec::new(&ros2_name(robot, "obstacle_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
@@ -135,18 +134,20 @@ impl RunnableNode for ScanObstacleNode {
     }
 }
 
+pub const SCAN_DISTANCE_NOISE: f64 = 0.1;
+pub const SCAN_HEADING_NOISE: f64 = PI / 16.0;
+
 fn publish_scan_obstacle_location(
     publisher: &Publisher<Ros2String>,
     distance: f32,
     heading: f32,
 ) -> anyhow::Result<()> {
     let msg = Ros2String {
-        data: format!("(object,{distance},{heading})"),
+        data: format!("(object,{distance},{heading},{SCAN_DISTANCE_NOISE},{SCAN_HEADING_NOISE})"),
     };
     publisher.publish(&msg)?;
     Ok(())
 }
-
 
 pub struct BitSlamNode {
     docs: ArgDocs,
@@ -319,7 +320,7 @@ fn publish_particle_obstacle(
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
     let map_input = obst.data.parse::<MapInput>()?;
-    particle_data.particle_filter.iterate(map_input, true);
+    particle_data.particle_filter.iterate(map_input);
     publish_particle(node, particle_data)?;
     Ok(())
 }
@@ -330,7 +331,7 @@ fn publish_particle_odom(
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
     let pose = pose_from_odometry(&odom);
-    particle_data.particle_filter.iterate(MapInput::Pose(pose), true);
+    particle_data.particle_filter.iterate(MapInput::Pose(pose));
     publish_particle(node, particle_data)?;
     Ok(())
 }

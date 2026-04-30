@@ -136,14 +136,15 @@ mod tests {
 
     #[test]
     fn test_occupancy_grid() {
-        let map = BitGridMap::from_map_inputs(0.1, 0.2, "odometry_staircase_1000_steps.mi").unwrap();
+        let map =
+            BitGridMap::from_map_inputs(0.1, 0.2, "odometry_staircase_1000_steps.mi").unwrap();
         let occupancy_grid = occupancy_grid_vec(&map);
         assert_eq!(occupancy_grid.len(), map.bounding_box().area() as usize);
         for y in 0..map.bounding_box().height() {
             for x in 0..map.bounding_box().width() {
                 let i = (y * map.bounding_box().width() + x) as usize;
                 let start = map.bounding_box().min();
-                let mapped = GridPoint::new([x as i64, y as i64]) + start; 
+                let mapped = GridPoint::new([x as i64, y as i64]) + start;
                 let expected = match map.cell_for(&mapped) {
                     particle_filter::Cell::Obstacle => 1,
                     particle_filter::Cell::Space => 0,

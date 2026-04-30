@@ -2,7 +2,7 @@ use std::{cmp::max, f64::consts::PI, sync::Arc};
 
 use arg_vals::{ArgDocs, ArgVals};
 
-use particle_filter::{angle::Radians, MapInput};
+use particle_filter::{MapInput, angle::Radians};
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::TwistStamped,
@@ -28,7 +28,10 @@ pub struct BumpTurnNode {
 impl Default for BumpTurnNode {
     fn default() -> Self {
         Self {
-            docs: ArgDocs::new("bump_turn_node", &vec![("--robot", "str", ""), ("--turn-distance", "f64", "0.5")]),
+            docs: ArgDocs::new(
+                "bump_turn_node",
+                &vec![("--robot", "str", ""), ("--turn-distance", "f64", "0.5")],
+            ),
         }
     }
 }
@@ -122,8 +125,8 @@ impl RunnableNode for BumpTurnNode {
             if let Ok(map_input) = obstacle.data.parse::<MapInput>() {
                 let turn = match map_input {
                     MapInput::Pose(_) => false,
-                    MapInput::Collision(_, _) => true,
-                    MapInput::RangeObject(distance, _) => distance < avoid_distance,
+                    MapInput::Collision(_) => true,
+                    MapInput::RangeObject(obstacle) => obstacle.distance() < avoid_distance,
                 };
 
                 if turn {
