@@ -11,7 +11,7 @@ if __name__ == '__main__':
     rclpy.init()
     executor = MultiThreadedExecutor()
     executor.add_node(TimeOfFlightNode(values['robot'], values['max-object-distance'], values['mode'], values['delay']))
-    subprocess.Popen(["../target/release/bump_turn_runner", f"--robot={sys.argv[1]}"])
+    subprocess.Popen(["../target/release/bump_turn_runner", f"--robot={values['robot']}"])
 
     while True:
         executor.spin_once()
