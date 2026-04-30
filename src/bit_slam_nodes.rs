@@ -253,7 +253,8 @@ impl BitSlamSetup {
         settings.square_size_m = args.get_value("--meters-per-cell")?;
         settings.save_inputs = args.get_value("--save-map")?;
         let node_name = ros2_name(&robot, "bitslam_node");
-        eprintln!("node_name in BitSlamSetup: {node_name}");
+        eprintln!("node_name in BitSlamSetup: {node_name}; robot is {robot}");
+        eprintln!("command-line args: {args:?}");
         Ok(Self {
             node_name,
             occupancy_grid_topic: occupancy_grid_topic_name(&robot),
