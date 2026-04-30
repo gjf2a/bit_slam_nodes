@@ -3,7 +3,7 @@
 # Documentation: https://qwiic-vl53l1x-py.readthedocs.io/en/latest/apiref.html
 
 import qwiic_vl53l1x
-import sys
+import sys, math
 
 import rclpy
 from rclpy.node import Node
@@ -30,7 +30,7 @@ class TimeOfFlightNode(Node):
             distance = self.tof.get_distance()
             if distance > 0 and (self.max_object_distance is None or distance < self.max_object_distance):
                 output = String()
-                output.data = f"(object,{distance/1000},0.0)"
+                output.data = f"(object,{distance/1000},0.0,0.05,{math.pi / 40})"
                 self.pub.publish(output)
             self.tof.clear_interrupt()
 
