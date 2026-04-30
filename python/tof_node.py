@@ -14,7 +14,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 class TimeOfFlightNode(Node):
     def __init__(self, robot_name: str, max_object_distance: int, distance_mode: int, delay: float):
-        super().__init__(f"TimeOfFlightNode_{robot_name}")
+        super().__init__(f"{robot_name}_TimeOfFlightNode")
         self.max_object_distance = max_object_distance
         tof_topic = f"{robot_name}_bitslam_obstacles"
         self.pub = self.create_publisher(String, tof_topic, qos_profile_sensor_data)
