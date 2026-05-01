@@ -13,8 +13,10 @@ from rclpy.executors import MultiThreadedExecutor
 
 
 class TimeOfFlightNode(Node):
-    def __init__(self, robot_name: str, max_object_distance: int, distance_mode: int, delay: float):
+    def __init__(self, robot_name: str, max_object_distance: int, distance_mode: int, delay: float, range_noise=0.05, heading_noise = math.pi / 40.0):
         super().__init__(f"{robot_name}_TimeOfFlightNode")
+        self.range_noise = range_noise
+        self.heading_noise = heading_noise
         self.max_object_distance = max_object_distance
         tof_topic = f"{robot_name}_bitslam_obstacles"
         self.pub = self.create_publisher(String, tof_topic, qos_profile_sensor_data)
@@ -28,9 +30,19 @@ class TimeOfFlightNode(Node):
     def timer_callback(self):
         if self.tof.check_for_data_ready():
             distance = self.tof.get_distance()
-            if distance > 0 and (self.max_object_distance is None or distance < self.max_object_distance):
+            data_type = None
+            if distance == 0:
+                if self.max_object_distance is not None:
+                    data_type = "freespace"
+                    distance = self.max_object_distance
+            elif self.max_object_distance is None or distance < self.max_object_distance:
+                data_type = "object"
+            else:
+                data_type = "freespace"
+
+            if data_type is not None:
                 output = String()
-                output.data = f"(object,{distance/1000},0.0,0.05,{math.pi / 40})"
+                output.data = f"({data_type},{distance/1000},0.0,{self.range_noise},{self.heading_noise})"
                 self.pub.publish(output)
             self.tof.clear_interrupt()
 
