@@ -127,6 +127,7 @@ impl RunnableNode for BumpTurnNode {
                     MapInput::Pose(_) => false,
                     MapInput::Collision(_) => true,
                     MapInput::RangeObject(obstacle) => obstacle.distance() < avoid_distance,
+                    MapInput::FreeSpace(_, _, _) => false,
                 };
 
                 if turn {
