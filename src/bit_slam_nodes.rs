@@ -111,13 +111,14 @@ impl RunnableNode for ScanObstacleNode {
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
-        let obstacle_threshold = 3.0;
+        let obstacle_threshold = 1.0;
         spec.subscribe(&subs[0], move |scan: LaserScan, _| {
             for (i, &range) in scan.ranges.iter().enumerate() {
                 if range > scan.range_min {
                     let tag = if range < obstacle_threshold {"object"} else {"freespace"};
                     let heading = scan.angle_min + (i as f32 * scan.angle_increment);
-                    if let Err(e) = publish_scan_obstacle_location(&publisher, tag, range, heading) {
+		    let dist = if range < obstacle_threshold {range} else {obstacle_threshold};
+                    if let Err(e) = publish_scan_obstacle_location(&publisher, tag, dist, heading) {
                         eprintln!("Error {e} when trying to publish scan obstacle");
                     }
                     break;
@@ -135,8 +136,8 @@ impl RunnableNode for ScanObstacleNode {
     }
 }
 
-pub const SCAN_DISTANCE_NOISE: f64 = 0.1;
-pub const SCAN_HEADING_NOISE: f64 = PI / 16.0;
+pub const SCAN_DISTANCE_NOISE: f64 = 0.05;
+pub const SCAN_HEADING_NOISE: f64 = 0.005;
 
 fn publish_scan_obstacle_location(
     publisher: &Publisher<Ros2String>,
