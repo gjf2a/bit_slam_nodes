@@ -7,7 +7,7 @@ use crate::{
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump,
-    path_plan::PathsBackTo,
+    path_plan::{PathsBackTo, necessary_turns_from},
 };
 use r2r::{
     Node, Publisher,
@@ -18,7 +18,7 @@ use r2r::{
     std_msgs::msg::String as Ros2String,
 };
 use smol::lock::Mutex;
-use std::{f64::consts::PI, sync::Arc};
+use std::sync::Arc;
 
 pub struct BumpObstacleNode {
     docs: ArgDocs,
@@ -115,9 +115,17 @@ impl RunnableNode for ScanObstacleNode {
         spec.subscribe(&subs[0], move |scan: LaserScan, _| {
             for (i, &range) in scan.ranges.iter().enumerate() {
                 if range > scan.range_min {
-                    let tag = if range < obstacle_threshold {"object"} else {"freespace"};
+                    let tag = if range < obstacle_threshold {
+                        "object"
+                    } else {
+                        "freespace"
+                    };
                     let heading = scan.angle_min + (i as f32 * scan.angle_increment);
-		    let dist = if range < obstacle_threshold {range} else {obstacle_threshold};
+                    let dist = if range < obstacle_threshold {
+                        range
+                    } else {
+                        obstacle_threshold
+                    };
                     if let Err(e) = publish_scan_obstacle_location(&publisher, tag, dist, heading) {
                         eprintln!("Error {e} when trying to publish scan obstacle");
                     }
@@ -296,7 +304,7 @@ impl BitSlamSetup {
                 if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
                     eprintln!("Error {e} when updating particle filter with {odom:?}");
                 }
-            } 
+            }
         })
     }
 
@@ -438,7 +446,8 @@ fn publish_goal_from_particle(
     stop_publisher: &Publisher<Ros2String>,
 ) {
     let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
-    if let Some(next_step) = paths.shortest_path().and_then(|p| p.get(1).copied()) {
+    let path = paths.shortest_path().map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
+    if let Some(next_step) = path.and_then(|p| p.get(1).copied()) {
         let meters = particle.map().to_meters(next_step);
         let target = particle.estimate().convert_to_raw_space(&meters);
         let msg = Ros2Point {
