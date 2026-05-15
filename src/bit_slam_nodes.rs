@@ -7,7 +7,7 @@ use crate::{
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump,
-    path_plan::{PathsBackTo, necessary_turns_from},
+    path_plan::{PathsBackTo, necessary_turns_from}, point::FloatPoint,
 };
 use r2r::{
     Node, Publisher,
@@ -202,6 +202,7 @@ impl RunnableNode for BitSlamNode {
             particle_publisher,
             occupancy_grid_publisher,
             status_publisher,
+            distance_from_start: None,
             map_saved: false,
         }));
         setup.subscribe_obstacle(&mut spec, particle_data.clone())?;
@@ -232,6 +233,7 @@ struct ParticleData {
     particle_publisher: Publisher<Ros2String>,
     occupancy_grid_publisher: Publisher<OccupancyGrid>,
     status_publisher: Publisher<Ros2String>,
+    distance_from_start: Option<FloatPoint>,
     map_saved: bool,
 }
 
@@ -313,8 +315,19 @@ impl BitSlamSetup {
         spec: &mut NodeSpec,
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
-        spec.subscribe(&self.save_topic, move |_: Ros2String, _| {
-            let particle_data = smol::block_on(particle_data.lock());
+        spec.subscribe(&self.save_topic, move |msg: Ros2String, _| {
+            let mut particle_data = smol::block_on(particle_data.lock());
+            let parts = msg.data.split_whitespace().collect::<Vec<_>>();
+            if parts[0] == "at" {
+                match parts[1].parse::<FloatPoint>() {
+                    Ok(point) => {
+                        particle_data.distance_from_start = Some(point);
+                    }
+                    Err(e) => {
+                        eprintln!("Error {e} when parsing ground truth offset.")
+                    }
+                }
+            }
             if let Err(e) = particle_data.save() {
                 eprintln!("Error {e} when saving particle filter.");
             }
@@ -385,7 +398,7 @@ impl BitSlamExplorerNode {
     }
 
     pub fn stop_publish_topic(&self, args: &ArgVals) -> anyhow::Result<String> {
-        Ok(ros2_name(robot_name!(args), "bitslam_explorer_stop"))
+        Ok(stop_topic_name(robot_name!(args)))
     }
 }
 
@@ -485,4 +498,8 @@ pub fn status_topic_name(robot: &str) -> String {
 
 pub fn save_topic_name(robot: &str) -> String {
     ros2_name(robot, "save_bitslam")
+}
+
+pub fn stop_topic_name(robot: &str) -> String {
+    ros2_name(robot, "bitslam_explorer_stop")
 }

@@ -14,7 +14,7 @@ pub fn ros2_name(robot: &str, concept: &str) -> String {
     if robot.len() == 0 {
         concept.to_string()
     } else {
-        format!("{robot}_{concept}")
+        format!("{robot}/{concept}")
     }
 }
 
