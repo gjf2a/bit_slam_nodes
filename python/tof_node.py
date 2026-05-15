@@ -25,6 +25,7 @@ class TimeOfFlightNode(Node):
         self.tof = qwiic_vl53l1x.QwiicVL53L1X()
         self.tof.sensor_init()
         self.tof.set_distance_mode(distance_mode)
+        self.tof.set_roi(16, 16, 199)
         self.tof.start_ranging()
 
     def timer_callback(self):
