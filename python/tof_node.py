@@ -14,11 +14,11 @@ from rclpy.executors import MultiThreadedExecutor
 
 class TimeOfFlightNode(Node):
     def __init__(self, robot_name: str, max_object_distance: int, distance_mode: int, delay: float, range_noise=0.05, heading_noise = math.pi / 40.0):
-        super().__init__(f"{robot_name}_TimeOfFlightNode")
+        super().__init__(f"{robot_name}/TimeOfFlightNode")
         self.range_noise = range_noise
         self.heading_noise = heading_noise
         self.max_object_distance = max_object_distance
-        tof_topic = f"{robot_name}_bitslam_obstacles"
+        tof_topic = f"{robot_name}/bitslam_obstacles"
         self.pub = self.create_publisher(String, tof_topic, qos_profile_sensor_data)
         print(f"Publishing on {tof_topic}")
         self.timer = self.create_timer(delay, self.timer_callback)
@@ -51,26 +51,26 @@ class TimeOfFlightNode(Node):
 def extract_args(values: dict[str,any]):
     for arg in sys.argv[1:]:
         parts = arg.split('=')
-        if parts[0] == 'mode':
-            values[parts[0]] = 1 if parts[1] == 'short' else 2
-        elif parts[0] == 'delay':
+        if parts[0] == '--mode':
+            values[parts[0]] = 1 if parts[1] == '--short' else 2
+        elif parts[0] == '--delay':
             values[parts[0]] = float(parts[1])
-        elif parts[0] == 'max-object-distance':
+        elif parts[0] == '--max-object-distance':
             values[parts[0]] = int(parts[1])
-        elif parts[0] == 'robot':
+        elif parts[0] == '--robot':
             values[parts[0]] = parts[1]
 
 
 
 if __name__ == '__main__':
     if len(sys.argv) == 1:
-        print("Usage: tof_node.py robot=robotname [mode=(short|long)] [delay=0.1s] [max-object-distance=mm]")
+        print("Usage: tof_node.py --robot=robotname [--mode=(short|long)] [--delay=0.1s] [--max-object-distance=mm]")
     else:
-        values = {'mode': 1, 'delay': 0.1, 'max-object-distance': None}
+        values = {'--mode': 1, '--delay': 0.1, '--max-object-distance': None}
         extract_args(values)
         rclpy.init()
         executor = MultiThreadedExecutor()
-        executor.add_node(TimeOfFlightNode(values['robot'], values['max-object-distance'], values['mode'], values['delay']))
+        executor.add_node(TimeOfFlightNode(values['--robot'], values['--max-object-distance'], values['--mode'], values['--delay']))
 
         while True:
             executor.spin_once()

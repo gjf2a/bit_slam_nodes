@@ -15,7 +15,7 @@ use smol::lock::Mutex;
 
 use crate::{
     PERIOD,
-    bit_slam_nodes::{hazards_from, obstacle_topic_name},
+    bit_slam_nodes::{hazards_from, obstacle_topic_name, stop_topic_name},
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
     util::{pose_from_odometry, ros2_name, twist_stamped},
@@ -41,6 +41,7 @@ enum AvoidMode {
     #[default]
     Forward,
     Turn,
+    Stop,
 }
 
 #[derive(Copy, Clone, Default, Debug)]
@@ -59,6 +60,7 @@ impl BumpTurnStatus {
     ) -> anyhow::Result<()> {
         if let Some((x, z)) = match self.mode {
             AvoidMode::Forward => Some((0.5, 0.0)),
+            AvoidMode::Stop => Some((0.0, 0.0)),
             AvoidMode::Turn => self.turn(msg_angle),
         } {
             publisher.publish(&twist_stamped(node, x, z)?)?;
@@ -107,7 +109,7 @@ impl RunnableNode for BumpTurnNode {
 
     fn subscribing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = robot_name!(args);
-        Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot)])
+        Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot), stop_topic_name(robot)])
     }
 
     fn spec(&self, args: &arg_vals::ArgVals) -> anyhow::Result<crate::node_struct::NodeSpec> {
@@ -138,11 +140,23 @@ impl RunnableNode for BumpTurnNode {
             }
         })?;
 
+        let odom_status = status.clone();
         spec.subscribe(&subs[1], move |odom: Odometry, node| {
             let pose = pose_from_odometry(&odom);
-            if let Some(mut status) = status.try_lock() {
+            if let Some(mut status) = odom_status.try_lock() {
                 if let Err(e) = status.bump_turn_move(pose.theta, node, &publisher) {
                     eprintln!("Error {e} from bump_turn_move()");
+                }
+            }
+        })?;
+
+        spec.subscribe(&subs[2], move |msg: Ros2String, _| {
+            let mut status = smol::block_on(status.lock());
+            match msg.data.as_str() {
+                "stop" => status.mode = AvoidMode::Stop,
+                "start" => status.mode = AvoidMode::Forward,
+                _ => {
+                    eprintln!("Unknown stop message: {}", msg.data);
                 }
             }
         })?;
@@ -225,6 +239,7 @@ impl IrHazardStatus {
         let (x, z) = match self.mode {
             AvoidMode::Forward => (0.5, 0.0),
             AvoidMode::Turn => (0.0, self.turn_coefficient),
+            AvoidMode::Stop => (0.0, 0.0),
         };
         self.max_ir_history.enqueue(current_max);
         publisher.publish(&twist_stamped(node, x, z)?)?;
