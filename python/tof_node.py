@@ -14,7 +14,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 class TimeOfFlightNode(Node):
     def __init__(self, robot_name: str, max_object_distance: int, distance_mode: int, delay: float, range_noise=0.05, heading_noise = math.pi / 40.0):
-        super().__init__(f"{robot_name}/TimeOfFlightNode")
+        super().__init__(f"{robot_name}_TimeOfFlightNode")
         self.range_noise = range_noise
         self.heading_noise = heading_noise
         self.max_object_distance = max_object_distance

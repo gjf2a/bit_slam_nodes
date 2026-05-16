@@ -6,12 +6,12 @@ import rclpy
 from rclpy.executors import MultiThreadedExecutor
 
 if __name__ == '__main__':
-    values = {'mode': 1, 'delay': 0.1, 'max-object-distance': None}
+    values = {'--mode': 1, '--delay': 0.1, '--max-object-distance': None}
     extract_args(values)
     rclpy.init()
     executor = MultiThreadedExecutor()
-    executor.add_node(TimeOfFlightNode(values['robot'], values['max-object-distance'], values['mode'], values['delay']))
-    subprocess.Popen(["../target/release/bump_turn_runner", f"--robot={values['robot']}"])
+    executor.add_node(TimeOfFlightNode(values['--robot'], values['--max-object-distance'], values['--mode'], values['--delay']))
+    subprocess.Popen(["../target/release/bump_turn_runner", f"--robot={values['--robot']}"])
 
     while True:
         executor.spin_once()
