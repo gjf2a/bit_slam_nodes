@@ -18,7 +18,7 @@ use crate::{
     bit_slam_nodes::{hazards_from, obstacle_topic_name, stop_topic_name},
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
-    util::{pose_from_odometry, ros2_name, twist_stamped},
+    util::{pose_from_odometry, ros2_topic_name, twist_stamped},
 };
 
 pub struct BumpTurnNode {
@@ -115,7 +115,7 @@ impl RunnableNode for BumpTurnNode {
     fn spec(&self, args: &arg_vals::ArgVals) -> anyhow::Result<crate::node_struct::NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let avoid_distance: f64 = args.get_value("--turn-distance")?;
-        let mut spec = NodeSpec::new(&ros2_name(robot, "bump_turn_node"), PERIOD)?;
+        let mut spec = NodeSpec::new(&ros2_topic_name(robot, "bump_turn_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
 
@@ -272,7 +272,7 @@ impl RunnableNode for IrHazardDataNode {
     fn spec(&self, args: &arg_vals::ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let ir_status = Arc::new(Mutex::new(IrHazardStatus::new(args)?));
-        let mut spec = NodeSpec::new(&ros2_name(robot, "ir_hazard_data_node"), PERIOD)?;
+        let mut spec = NodeSpec::new(&ros2_topic_name(robot, "ir_hazard_data_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let ir_status_bump = ir_status.clone();

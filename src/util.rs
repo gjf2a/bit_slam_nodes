@@ -10,7 +10,15 @@ use r2r::{
     std_msgs::msg::Header,
 };
 
-pub fn ros2_name(robot: &str, concept: &str) -> String {
+pub fn ros2_node_name(robot: &str, concept: &str) -> String {
+    if robot.len() == 0 {
+        concept.to_string()
+    } else {
+        format!("{robot}_{concept}")
+    }
+}
+
+pub fn ros2_topic_name(robot: &str, concept: &str) -> String {
     if robot.len() == 0 {
         concept.to_string()
     } else {
