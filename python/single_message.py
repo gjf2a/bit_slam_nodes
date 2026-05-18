@@ -6,7 +6,7 @@ from rclpy.executors import MultiThreadedExecutor
 
 class MsgNode(Node):
     def __init__(self, robot: str, node_name: str, topic: str, msg: str):
-        super(f"{robot}/{node_name}")
+        super().__init__(f"{robot}_{node_name}")
         self.pub = self.create_publisher(String, topic, qos_profile_sensor_data)
         self.msg = msg
         self.timer = self.create_timer(0.1, self.timer_callback)
