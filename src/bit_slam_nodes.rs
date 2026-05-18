@@ -317,6 +317,7 @@ impl BitSlamSetup {
     ) -> anyhow::Result<()> {
         spec.subscribe(&self.save_topic, move |msg: Ros2String, _| {
             let mut particle_data = smol::block_on(particle_data.lock());
+            eprintln!("Received save message: \"{}\"", msg.data);
             let parts = msg.data.split_whitespace().collect::<Vec<_>>();
             if parts[0] == "at" {
                 match parts[1].parse::<FloatPoint>() {
