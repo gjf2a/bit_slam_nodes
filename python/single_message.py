@@ -20,9 +20,10 @@ class MsgNode(Node):
             self.posted = True
 
 
-def post_msg(robot: str, node_name: str, topic: str, msg: str):
+def post_msg(robot: str, node_name: str, topic: str, msg: str, attempts=10):
     rclpy.init()
     executor = MultiThreadedExecutor()
     executor.add_node(MsgNode(robot, node_name, topic, msg))
-    executor.spin_once()
+    for _ in range(attempts):
+        executor.spin_once()
     rclpy.shutdown()
