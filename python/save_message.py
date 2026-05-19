@@ -1,5 +1,5 @@
 import sys
-import single_message
+import send_message
 
 def extract_args() -> dict[str,any]: 
     values = {}
@@ -19,4 +19,4 @@ if __name__ == '__main__':
         msg = f"at ({args['--at']})"
     else:
         msg = "save"
-    single_message.post_msg(robot, "SaveNode", f"{robot}/save_bitslam", msg)
+    send_message.post_msg(robot, "SaveNode", f"{robot}/bitslam_save", msg)

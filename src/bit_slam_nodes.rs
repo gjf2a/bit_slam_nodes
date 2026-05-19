@@ -302,10 +302,9 @@ impl BitSlamSetup {
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
         spec.subscribe(&self.odom_topic, move |odom: Odometry, node| {
-            if let Some(mut particle_data) = particle_data.try_lock() {
-                if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
-                    eprintln!("Error {e} when updating particle filter with {odom:?}");
-                }
+            let mut particle_data = smol::block_on(particle_data.lock());
+            if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
+                eprintln!("Error {e} when updating particle filter with {odom:?}");
             }
         })
     }
@@ -498,7 +497,7 @@ pub fn status_topic_name(robot: &str) -> String {
 }
 
 pub fn save_topic_name(robot: &str) -> String {
-    ros2_topic_name(robot, "save_bitslam")
+    ros2_topic_name(robot, "bitslam_save")
 }
 
 pub fn stop_topic_name(robot: &str) -> String {

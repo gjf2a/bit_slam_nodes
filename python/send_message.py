@@ -27,3 +27,11 @@ def post_msg(robot: str, node_name: str, topic: str, msg: str, attempts=10):
     for _ in range(attempts):
         executor.spin_once()
     rclpy.shutdown()
+
+
+def spam_msg(robot: str, node_name: str, topic: str, msg: str):
+    rclpy.init()
+    executor = MultiThreadedExecutor()
+    executor.add_node(MsgNode(robot, node_name, topic, msg))
+    while True:
+        executor.spin_once()

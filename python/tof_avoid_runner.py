@@ -1,5 +1,4 @@
 import subprocess
-import sys
 from tof_node import TimeOfFlightNode, extract_args
 
 import rclpy
