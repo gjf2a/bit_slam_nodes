@@ -16,7 +16,7 @@ if __name__ == '__main__':
     args = extract_args()
     robot = args.get("--robot", "")
     if "--at" in args:
-        msg = f"at {args['--at']}"
+        msg = f"at ({args['--at']})"
     else:
         msg = "save"
     single_message.post_msg(robot, "SaveNode", f"{robot}/save_bitslam", msg)
