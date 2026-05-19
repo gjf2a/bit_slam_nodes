@@ -55,7 +55,7 @@ impl BumpTurnStatus {
     fn bump_turn_move(
         &mut self,
         msg_angle: Radians,
-        node: &Node,
+        node: Arc<Mutex<Node>>,
         publisher: &Publisher<TwistStamped>,
     ) -> anyhow::Result<()> {
         if let Some((x, z)) = match self.mode {
@@ -223,7 +223,7 @@ impl IrHazardStatus {
     fn handle_ir(
         &mut self,
         ir: IrIntensityVector,
-        node: &Node,
+        node: Arc<Mutex<Node>>,
         publisher: &Publisher<TwistStamped>,
     ) -> anyhow::Result<()> {
         let current_max = ir.readings.iter().map(|i| i.value).max().unwrap();

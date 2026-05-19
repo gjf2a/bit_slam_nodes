@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use chrono::Local;
 use particle_filter::{BitGridMap, Particle};
 use particle_filter::{angle::Radians, pose::RobotPose};
@@ -9,6 +11,7 @@ use r2r::{
     geometry_msgs::msg::{Twist, TwistStamped, Vector3},
     std_msgs::msg::Header,
 };
+use smol::lock::Mutex;
 
 pub fn ros2_node_name(robot: &str, concept: &str) -> String {
     if robot.len() == 0 {
@@ -63,7 +66,8 @@ pub fn pose_from_odometry(value: &Odometry) -> RobotPose<Radians> {
     result
 }
 
-pub fn stamped_header(node: &Node) -> anyhow::Result<Header> {
+pub fn stamped_header(node: Arc<Mutex<Node>>) -> anyhow::Result<Header> {
+    let node = smol::block_on(node.lock());
     let clock = node.get_ros_clock();
     let mut clock = clock.lock().unwrap();
     let now = clock.get_now()?;
@@ -77,7 +81,7 @@ pub fn stamped_header(node: &Node) -> anyhow::Result<Header> {
     })
 }
 
-pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped> {
+pub fn twist_stamped(node: Arc<Mutex<Node>>, x: f64, z: f64) -> anyhow::Result<TwistStamped> {
     Ok(TwistStamped {
         header: stamped_header(node)?,
         twist: Twist {
@@ -87,7 +91,7 @@ pub fn twist_stamped(node: &Node, x: f64, z: f64) -> anyhow::Result<TwistStamped
     })
 }
 
-pub fn particle2rosgrid(node: &Node, particle: &Particle) -> anyhow::Result<OccupancyGrid> {
+pub fn particle2rosgrid(node: Arc<Mutex<Node>>, particle: &Particle) -> anyhow::Result<OccupancyGrid> {
     let header = stamped_header(node)?;
     let info = map_meta_data(&header, particle.map());
     Ok(OccupancyGrid {

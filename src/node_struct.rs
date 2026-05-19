@@ -110,7 +110,7 @@ impl NodeSpec {
 
     pub fn subscribe<
         P: WrappedTypesupport + 'static + Send,
-        F: FnMut(P, &Node) + Send + 'static,
+        F: FnMut(P, Arc<Mutex<Node>>) + Send + 'static,
     >(
         &mut self,
         topic: &str,
@@ -124,11 +124,8 @@ impl NodeSpec {
         let node = self.node.clone();
         self.futures.push(Box::pin(async move {
             let mut handler = handler;
-            loop {
-                if let Some(msg) = subscriber.next().await {
-                    let node = smol::block_on(node.lock());
-                    handler(msg, &node);
-                }
+            while let Some(msg) = subscriber.next().await {
+                handler(msg, node.clone());
             }
         }));
         Ok(())

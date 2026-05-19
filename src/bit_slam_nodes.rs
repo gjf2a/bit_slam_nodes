@@ -336,7 +336,7 @@ impl BitSlamSetup {
 }
 
 fn publish_particle_obstacle(
-    node: &Node,
+    node: Arc<Mutex<Node>>,
     obst: &Ros2String,
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
@@ -347,7 +347,7 @@ fn publish_particle_obstacle(
 }
 
 fn publish_particle_odom(
-    node: &Node,
+    node: Arc<Mutex<Node>>,
     odom: &Odometry,
     particle_data: &mut ParticleData,
 ) -> anyhow::Result<()> {
@@ -357,7 +357,7 @@ fn publish_particle_odom(
     Ok(())
 }
 
-fn publish_particle(node: &Node, particle_data: &mut ParticleData) -> anyhow::Result<()> {
+fn publish_particle(node: Arc<Mutex<Node>>, particle_data: &mut ParticleData) -> anyhow::Result<()> {
     let failure = particle_data.particle_filter.example_failure();
     let particle = match failure.as_ref() {
         None => particle_data.particle_filter.particles().next().unwrap(),

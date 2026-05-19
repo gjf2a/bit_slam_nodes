@@ -140,7 +140,7 @@ impl RunnableNode for DefuzzifyingErrorCorrectingNode {
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
         spec.subscribe(&subs[0], move |msg: Ros2String, node| {
-            if let Err(e) = publish_fuzzy_twist(&msg, &node, &publisher) {
+            if let Err(e) = publish_fuzzy_twist(&msg, node, &publisher) {
                 eprintln!("Error {e} when publishing {}", msg.data);
             }
         })?;
@@ -160,7 +160,7 @@ impl RunnableNode for DefuzzifyingErrorCorrectingNode {
 
 fn publish_fuzzy_twist(
     msg: &Ros2String,
-    node: &Node,
+    node: Arc<Mutex<Node>>,
     publisher: &Publisher<TwistStamped>,
 ) -> anyhow::Result<()> {
     let fuzzy_error = serde_json::from_str::<FuzzyError>(&msg.data)?;
@@ -196,7 +196,7 @@ impl FuzzyError {
         }
     }
 
-    pub fn defuzzify_twist_stamped(&self, node: &Node) -> anyhow::Result<TwistStamped> {
+    pub fn defuzzify_twist_stamped(&self, node: Arc<Mutex<Node>>) -> anyhow::Result<TwistStamped> {
         let x = self.distance.defuzzify(0.0, X_LIMIT);
         let turn_limit = Z_LIMIT * (if self.left > self.right { 1.0 } else { -1.0 });
         let z = (self.left | self.right).defuzzify(0.0, turn_limit);
