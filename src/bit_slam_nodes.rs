@@ -424,11 +424,13 @@ impl RunnableNode for BitSlamExplorerNode {
         let robot = args.get_str_value("--robot")?;
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "explorer_node"), PERIOD)?;
         let pubs = self.publishing_topics(args)?;
+        let subs = self.subscribing_topics(args)?;
         let point_publisher = spec.publisher::<Ros2Point>(&pubs[0])?;
         let stop_publisher = spec.publisher::<Ros2String>(&pubs[1])?;
         let current_target = Arc::new(AtomicCell::new(None));
+        let current_target_sub1 = current_target.clone();
         spec.subscribe(
-            &particle_topic_name(robot),
+            &subs[0],
             move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
                 &particle_str.data,
             ) {
@@ -440,6 +442,13 @@ impl RunnableNode for BitSlamExplorerNode {
                 }
             },
         )?;
+        spec.subscribe(&subs[1], move |obstacle: Ros2String, _| {
+            if let Ok(map_input) = obstacle.data.parse::<MapInput>() {
+                if let MapInput::Collision(_) = map_input {
+                    current_target_sub1.clone().store(None);
+                }
+            }
+        })?;
         Ok(spec)
     }
 
@@ -451,7 +460,8 @@ impl RunnableNode for BitSlamExplorerNode {
     }
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
-        Ok(vec![particle_topic_name(robot_name!(args))])
+        let robot = robot_name!(args);
+        Ok(vec![particle_topic_name(robot), obstacle_topic_name(robot)])
     }
 }
 
