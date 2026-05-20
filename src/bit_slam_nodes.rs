@@ -5,6 +5,7 @@ use crate::{
     util::{particle2rosgrid, pose_from_odometry, ros2_node_name, ros2_topic_name, timestamped_filename},
 };
 use arg_vals::{ArgDocs, ArgVals};
+use crossbeam::atomic::AtomicCell;
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump,
     path_plan::{PathsBackTo, necessary_turns_from}, point::FloatPoint,
@@ -425,13 +426,14 @@ impl RunnableNode for BitSlamExplorerNode {
         let pubs = self.publishing_topics(args)?;
         let point_publisher = spec.publisher::<Ros2Point>(&pubs[0])?;
         let stop_publisher = spec.publisher::<Ros2String>(&pubs[1])?;
+        let current_target = Arc::new(AtomicCell::new(None));
         spec.subscribe(
             &particle_topic_name(robot),
             move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
                 &particle_str.data,
             ) {
                 Ok(particle) => {
-                    publish_goal_from_particle(&particle, &point_publisher, &stop_publisher)
+                    publish_goal_from_particle(&particle, &point_publisher, &stop_publisher, current_target.clone())
                 }
                 Err(e) => {
                     eprintln!("Error {e} when deserializing particle");
@@ -457,7 +459,15 @@ fn publish_goal_from_particle(
     particle: &Particle,
     point_publisher: &Publisher<Ros2Point>,
     stop_publisher: &Publisher<Ros2String>,
+    current_target: Arc<AtomicCell<Option<FloatPoint>>>,
 ) {
+    if let Some(current_target) = current_target.load() {
+        if particle.estimate().last_raw_pose().map_or(false, |p| current_target.euclidean_distance(p.pos) > 0.10) {
+            eprintln!("Heading towards {current_target}");
+            publish_target(current_target, point_publisher);
+            return;
+        }
+    }
     let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
     let path = paths.shortest_path().map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
     if let Some(path) = path {
@@ -466,11 +476,13 @@ fn publish_goal_from_particle(
             let target = particle.estimate().convert_to_raw_space(&meters);
             eprintln!("target from map: {target}");
             publish_target(target, point_publisher);
+            current_target.store(Some(target));
         } else {
             if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
                 let target = last_raw_pose + (1.0, last_raw_pose.theta);
                 eprintln!("At edge; target is {target}");
                 publish_target(target, point_publisher);
+                current_target.store(Some(target));
             } else {
                 eprintln!("Just starting - no last raw pose");
             }            
