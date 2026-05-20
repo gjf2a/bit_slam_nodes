@@ -464,10 +464,12 @@ fn publish_goal_from_particle(
         if let Some(next_step) = path.get(1).copied() {
             let meters = particle.map().to_meters(next_step);
             let target = particle.estimate().convert_to_raw_space(&meters);
+            eprintln!("target from map: {target}");
             publish_target(target, point_publisher);
         } else {
             if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
                 let target = last_raw_pose + (1.0, last_raw_pose.theta);
+                eprintln!("At edge; target is {target}");
                 publish_target(target, point_publisher);
             } else {
                 eprintln!("Just starting - no last raw pose");
@@ -483,7 +485,6 @@ fn publish_goal_from_particle(
 }
 
 fn publish_target(target: FloatPoint, point_publisher: &Publisher<Ros2Point>) {
-    eprintln!("Publishing target {target}");
     let msg = Ros2Point {
         x: target[0],
         y: target[1],
