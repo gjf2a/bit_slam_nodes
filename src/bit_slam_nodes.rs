@@ -483,6 +483,7 @@ fn publish_goal_from_particle(
 }
 
 fn publish_target(target: FloatPoint, point_publisher: &Publisher<Ros2Point>) {
+    eprintln!("Publishing target {target}");
     let msg = Ros2Point {
         x: target[0],
         y: target[1],
