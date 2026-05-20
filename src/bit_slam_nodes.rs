@@ -460,16 +460,18 @@ fn publish_goal_from_particle(
 ) {
     let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
     let path = paths.shortest_path().map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
-    if let Some(next_step) = path.and_then(|p| p.get(1).copied()) {
-        let meters = particle.map().to_meters(next_step);
-        let target = particle.estimate().convert_to_raw_space(&meters);
-        let msg = Ros2Point {
-            x: target[0],
-            y: target[1],
-            z: 0.0,
-        };
-        if let Err(e) = point_publisher.publish(&msg) {
-            eprintln!("Error {e} when trying to publish {msg:?}");
+    if let Some(path) = path {
+        if let Some(next_step) = path.get(1).copied() {
+            let meters = particle.map().to_meters(next_step);
+            let target = particle.estimate().convert_to_raw_space(&meters);
+            publish_target(target, point_publisher);
+        } else {
+            if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
+                let target = last_raw_pose + (1.0, last_raw_pose.theta);
+                publish_target(target, point_publisher);
+            } else {
+                eprintln!("Just starting - no last raw pose");
+            }            
         }
     } else {
         eprintln!("There is not a path");
@@ -477,6 +479,17 @@ fn publish_goal_from_particle(
         if let Err(e) = stop_publisher.publish(&Ros2String { data }) {
             eprintln!("Error {e} when trying to publish stop message");
         }
+    }
+}
+
+fn publish_target(target: FloatPoint, point_publisher: &Publisher<Ros2Point>) {
+    let msg = Ros2Point {
+        x: target[0],
+        y: target[1],
+        z: 0.0,
+    };
+    if let Err(e) = point_publisher.publish(&msg) {
+        eprintln!("Error {e} when trying to publish {msg:?}");
     }
 }
 
