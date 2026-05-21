@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{f64::consts::PI, sync::Arc};
 
 use crate::{
     PERIOD,
@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use smol::lock::Mutex;
 
 const DISTANCE_LIMIT: f64 = 0.25;
-const ANGLE_LIMIT: f64 = 0.2;
+const ANGLE_LIMIT: f64 = PI / 2.0;
 const X_LIMIT: f64 = 0.5;
 const Z_LIMIT: f64 = 1.0;
 
@@ -106,10 +106,8 @@ fn publish_odom_fuzzy(
 ) -> anyhow::Result<()> {
     let odom_point = pt!(odom.pose.pose.position.x, odom.pose.pose.position.y);
     let yaw = find_yaw(&odom);
-    eprintln!("yaw: {yaw} odom_point: {odom_point}");
     let error: FuzzyError = FuzzyError::new(&odom_point, &yaw, &goal);
     let data = serde_json::to_string(&error)?;
-    eprintln!("fuzzy error: {data}");
     publisher.publish(&Ros2String { data })?;
     Ok(())
 }
