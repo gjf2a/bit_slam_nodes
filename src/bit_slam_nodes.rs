@@ -207,7 +207,6 @@ impl RunnableNode for BitSlamNode {
             particle_publisher,
             occupancy_grid_publisher,
             status_publisher,
-            distance_from_start: None,
             map_saved: false,
         }));
         setup.subscribe_obstacle(&mut spec, particle_data.clone())?;
@@ -238,7 +237,6 @@ struct ParticleData {
     particle_publisher: Publisher<Ros2String>,
     occupancy_grid_publisher: Publisher<OccupancyGrid>,
     status_publisher: Publisher<Ros2String>,
-    distance_from_start: Option<FloatPoint>,
     map_saved: bool,
 }
 
@@ -326,7 +324,8 @@ impl BitSlamSetup {
             if parts[0] == "at" {
                 match parts[1].parse::<FloatPoint>() {
                     Ok(point) => {
-                        particle_data.distance_from_start = Some(point);
+                        particle_data.particle_filter.set_actual_ending_point(point);
+                        eprintln!("distance from start: {point}");
                     }
                     Err(e) => {
                         eprintln!("Error {e} when parsing ground truth offset.")
