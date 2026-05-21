@@ -8,6 +8,7 @@ use crate::{
     util::{find_yaw, ros2_node_name, ros2_topic_name, twist_stamped},
 };
 use arg_vals::{ArgDocs, ArgVals};
+use crossbeam::atomic::AtomicCell;
 use particle_filter::{angle::Radians, point::FloatPoint, pt};
 use r2r::{
     Node, Publisher,
@@ -63,9 +64,13 @@ impl RunnableNode for GoalFuzzifierNode {
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         let goal = Arc::new(Mutex::new(None));
         let set_goal = goal.clone();
+        let stopped = Arc::new(AtomicCell::new(false));
+        let stopped_goal_sub = stopped.clone();
         spec.subscribe(&subs[0], move |msg: Ros2Point, _| {
-            let mut goal = smol::block_on(set_goal.lock());
-            *goal = Some(pt!(msg.x, msg.y));
+            if !stopped_goal_sub.clone().load() {
+                let mut goal = smol::block_on(set_goal.lock());
+                *goal = Some(pt!(msg.x, msg.y));
+            }
         })?;
         let goal_goal = goal.clone();
         spec.subscribe(&subs[1], move |odom: Odometry, _| {
@@ -79,6 +84,9 @@ impl RunnableNode for GoalFuzzifierNode {
             if msg.data.to_lowercase() == "stop" {
                 let mut goal = smol::block_on(goal.lock());
                 *goal = None;
+                stopped.clone().store(true);
+            } else if msg.data.to_lowercase() == "resume" {
+                stopped.clone().store(false);
             }
         })?;
         Ok(spec)

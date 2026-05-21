@@ -12,7 +12,7 @@ use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings,
     irobot_create3::Bump,
     path_plan::{PathsBackTo, necessary_turns_from},
-    point::FloatPoint,
+    point::{FloatPoint, GridPoint},
 };
 use r2r::{
     Node, Publisher,
@@ -496,28 +496,35 @@ fn publish_goal_from_particle(
         .shortest_path()
         .map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
     if let Some(path) = path {
-        if let Some(next_step) = path.get(1).copied() {
-            let meters = particle.map().to_meters(next_step);
-            let target = particle.estimate().convert_to_raw_space(&meters);
-            eprintln!("target from map: {target}");
-            publish_target(target, point_publisher);
-            current_target.store(Some(target));
-        } else {
-            if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
-                let target = last_raw_pose + (1.0, last_raw_pose.theta);
-                eprintln!("At edge; target is {target}");
-                publish_target(target, point_publisher);
-                current_target.store(Some(target));
-            } else {
-                eprintln!("Just starting - no last raw pose");
-            }
-        }
+        follow_path(&path, particle, point_publisher, current_target);
     } else {
         eprintln!("There is not a path");
         let data = "stop".to_string();
         if let Err(e) = stop_publisher.publish(&Ros2String { data }) {
             eprintln!("Error {e} when trying to publish stop message");
         }
+    }
+}
+
+fn follow_path(
+    path: &Vec<GridPoint>, 
+    particle: &Particle,
+    point_publisher: &Publisher<Ros2Point>,
+    current_target: Arc<AtomicCell<Option<FloatPoint>>>,
+) {
+    if let Some(next_step) = path.get(1).copied() {
+        let meters = particle.map().to_meters(next_step);
+        let target = particle.estimate().convert_to_raw_space(&meters);
+        eprintln!("target from map: {target}");
+        publish_target(target, point_publisher);
+        current_target.store(Some(target));
+    } else if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
+        let target = last_raw_pose + (1.0, last_raw_pose.theta);
+        eprintln!("At edge; target is {target}");
+        publish_target(target, point_publisher);
+        current_target.store(Some(target));
+    } else {
+        eprintln!("Just starting - no last raw pose");
     }
 }
 
