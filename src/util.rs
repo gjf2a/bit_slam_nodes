@@ -91,7 +91,10 @@ pub fn twist_stamped(node: Arc<Mutex<Node>>, x: f64, z: f64) -> anyhow::Result<T
     })
 }
 
-pub fn particle2rosgrid(node: Arc<Mutex<Node>>, particle: &Particle) -> anyhow::Result<OccupancyGrid> {
+pub fn particle2rosgrid(
+    node: Arc<Mutex<Node>>,
+    particle: &Particle,
+) -> anyhow::Result<OccupancyGrid> {
     let header = stamped_header(node)?;
     let info = map_meta_data(&header, particle.map());
     Ok(OccupancyGrid {

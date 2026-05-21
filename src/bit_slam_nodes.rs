@@ -2,13 +2,17 @@ use crate::{
     PERIOD,
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
-    util::{particle2rosgrid, pose_from_odometry, ros2_node_name, ros2_topic_name, timestamped_filename},
+    util::{
+        particle2rosgrid, pose_from_odometry, ros2_node_name, ros2_topic_name, timestamped_filename,
+    },
 };
 use arg_vals::{ArgDocs, ArgVals};
 use crossbeam::atomic::AtomicCell;
 use particle_filter::{
-    MapInput, Particle, ParticleFilter, ParticleFilterSettings, irobot_create3::Bump,
-    path_plan::{PathsBackTo, necessary_turns_from}, point::FloatPoint,
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings,
+    irobot_create3::Bump,
+    path_plan::{PathsBackTo, necessary_turns_from},
+    point::FloatPoint,
 };
 use r2r::{
     Node, Publisher,
@@ -358,7 +362,10 @@ fn publish_particle_odom(
     Ok(())
 }
 
-fn publish_particle(node: Arc<Mutex<Node>>, particle_data: &mut ParticleData) -> anyhow::Result<()> {
+fn publish_particle(
+    node: Arc<Mutex<Node>>,
+    particle_data: &mut ParticleData,
+) -> anyhow::Result<()> {
     let failure = particle_data.particle_filter.example_failure();
     let particle = match failure.as_ref() {
         None => particle_data.particle_filter.particles().next().unwrap(),
@@ -434,9 +441,12 @@ impl RunnableNode for BitSlamExplorerNode {
             move |particle_str: Ros2String, _| match serde_json::from_str::<Particle>(
                 &particle_str.data,
             ) {
-                Ok(particle) => {
-                    publish_goal_from_particle(&particle, &point_publisher, &stop_publisher, current_target.clone())
-                }
+                Ok(particle) => publish_goal_from_particle(
+                    &particle,
+                    &point_publisher,
+                    &stop_publisher,
+                    current_target.clone(),
+                ),
                 Err(e) => {
                     eprintln!("Error {e} when deserializing particle");
                 }
@@ -472,14 +482,20 @@ fn publish_goal_from_particle(
     current_target: Arc<AtomicCell<Option<FloatPoint>>>,
 ) {
     if let Some(current_target) = current_target.load() {
-        if particle.estimate().last_raw_pose().map_or(false, |p| current_target.euclidean_distance(p.pos) > 0.10) {
+        if particle
+            .estimate()
+            .last_raw_pose()
+            .map_or(false, |p| current_target.euclidean_distance(p.pos) > 0.10)
+        {
             eprintln!("Heading towards {current_target}");
             publish_target(current_target, point_publisher);
             return;
         }
     }
     let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
-    let path = paths.shortest_path().map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
+    let path = paths
+        .shortest_path()
+        .map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
     if let Some(path) = path {
         if let Some(next_step) = path.get(1).copied() {
             let meters = particle.map().to_meters(next_step);
@@ -495,7 +511,7 @@ fn publish_goal_from_particle(
                 current_target.store(Some(target));
             } else {
                 eprintln!("Just starting - no last raw pose");
-            }            
+            }
         }
     } else {
         eprintln!("There is not a path");

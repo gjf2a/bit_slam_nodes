@@ -109,7 +109,11 @@ impl RunnableNode for BumpTurnNode {
 
     fn subscribing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = robot_name!(args);
-        Ok(vec![obstacle_topic_name(robot), odom_topic_name(robot), stop_topic_name(robot)])
+        Ok(vec![
+            obstacle_topic_name(robot),
+            odom_topic_name(robot),
+            stop_topic_name(robot),
+        ])
     }
 
     fn spec(&self, args: &arg_vals::ArgVals) -> anyhow::Result<crate::node_struct::NodeSpec> {

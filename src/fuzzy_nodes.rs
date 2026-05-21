@@ -106,6 +106,7 @@ fn publish_odom_fuzzy(
 ) -> anyhow::Result<()> {
     let odom_point = pt!(odom.pose.pose.position.x, odom.pose.pose.position.y);
     let yaw = find_yaw(&odom);
+    eprintln!("yaw: {yaw} odom_point: {odom_point}");
     let error = FuzzyError::new(&odom_point, &yaw, &goal);
     let data = serde_json::to_string(&error)?;
     publisher.publish(&Ros2String { data })?;
