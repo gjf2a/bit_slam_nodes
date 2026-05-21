@@ -487,7 +487,6 @@ fn publish_goal_from_particle(
             .last_raw_pose()
             .map_or(false, |p| current_target.euclidean_distance(p.pos) > 0.10)
         {
-            eprintln!("Heading towards {current_target}");
             publish_target(current_target, point_publisher);
             return;
         }
