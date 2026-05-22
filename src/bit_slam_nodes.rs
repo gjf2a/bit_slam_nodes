@@ -7,6 +7,7 @@ use crate::{
     },
 };
 use arg_vals::{ArgDocs, ArgVals};
+use crossbeam::atomic::AtomicCell;
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings,
     irobot_create3::{Bump, IrHeading, IrReading},
@@ -50,16 +51,21 @@ impl RunnableNode for BumpObstacleNode {
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "obstacle_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
-        let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
+        let pending_hazard: Arc<AtomicCell<Option<Bump>>> = Arc::new(AtomicCell::new(None));
+        let ir_hazard_check = pending_hazard.clone();
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
-            for (frame_id, bump) in hazards_from(&hazards) {
-                if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
-                    eprintln!("Error {e} when trying to publish hazard {frame_id}.");
-                }
+            for (_, bump) in hazards_from(&hazards) {
+                pending_hazard.store(Some(bump));
             }
         })?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[1], move |ir: IrIntensityVector, _| {
+            let bump = ir_hazard_check.swap(None);
+            if let Some(bump) = bump {
+                if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
+                    eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
+                }
+            }
             for sensor in ir.readings {
                 match decode_ir(&sensor) {
                     Ok(ir) => {
@@ -504,7 +510,7 @@ fn follow_path(
     if let Some(next_step) = path.get(1).copied() {
         let meters = particle.map().to_meters(next_step);
         let target = particle.estimate().convert_to_raw_space(&meters);
-        eprintln!("target from map: {target}");
+        //eprintln!("target from map: {target}");
         publish_target(target, point_publisher);
     } else if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
         let target = last_raw_pose + (1.0, last_raw_pose.theta);
