@@ -17,7 +17,7 @@ use particle_filter::{
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::Point as Ros2Point,
-    irobot_create_msgs::msg::HazardDetectionVector,
+    irobot_create_msgs::msg::{HazardDetectionVector, IrIntensityVector},
     nav_msgs::msg::{OccupancyGrid, Odometry},
     sensor_msgs::msg::LaserScan,
     std_msgs::msg::String as Ros2String,
@@ -59,6 +59,9 @@ impl RunnableNode for BumpObstacleNode {
                 }
             }
         })?;
+        spec.subscribe(&subs[1], move |ir: IrIntensityVector, _| {
+            
+        })?;
         Ok(spec)
     }
 
@@ -68,7 +71,7 @@ impl RunnableNode for BumpObstacleNode {
 
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = robot_name!(args);
-        Ok(vec![format!("{robot}/hazard_detection")])
+        Ok(vec![format!("{robot}/hazard_detection"), format!("{robot}/ir_intensity")])
     }
 }
 

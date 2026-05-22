@@ -42,7 +42,7 @@ impl RunnableNode for ShowIrNode {
         let subs = self.subscribing_topics(args)?;
         spec.subscribe(&subs[0], move |ir: IrIntensityVector, _| {
             for value in ir.readings.iter() {
-                print!("{} ", value.value);
+                print!("{}: {} ", value.header.frame_id, value.value);
             }
             println!();
         })?;
