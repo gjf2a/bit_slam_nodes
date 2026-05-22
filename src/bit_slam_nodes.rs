@@ -487,7 +487,7 @@ fn publish_goal_from_particle(
     stop_publisher: &Publisher<Ros2String>,
     current_target: Arc<AtomicCell<Option<FloatPoint>>>,
 ) {
-    if let Some(current_target) = current_target.load() {
+    /*if let Some(current_target) = current_target.load() {
         if particle
             .estimate()
             .last_raw_pose()
@@ -496,7 +496,7 @@ fn publish_goal_from_particle(
             publish_target(current_target, point_publisher);
             return;
         }
-    }
+    }*/
     let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
     let path = paths
         .shortest_path()
