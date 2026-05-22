@@ -3,21 +3,21 @@ use crate::{
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
     util::{
-        particle2rosgrid, pose_from_odometry, ros2_node_name, ros2_topic_name, timestamped_filename,
+        particle2rosgrid, pose_from_odometry, publish_str, ros2_node_name, ros2_topic_name, timestamped_filename
     },
 };
 use arg_vals::{ArgDocs, ArgVals};
 use crossbeam::atomic::AtomicCell;
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings,
-    irobot_create3::Bump,
+    irobot_create3::{Bump, IrHeading, IrReading},
     path_plan::{PathsBackTo, necessary_turns_from},
     point::{FloatPoint, GridPoint},
 };
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::Point as Ros2Point,
-    irobot_create_msgs::msg::{HazardDetectionVector, IrIntensityVector},
+    irobot_create_msgs::msg::{HazardDetectionVector, IrIntensity, IrIntensityVector},
     nav_msgs::msg::{OccupancyGrid, Odometry},
     sensor_msgs::msg::LaserScan,
     std_msgs::msg::String as Ros2String,
@@ -54,13 +54,25 @@ impl RunnableNode for BumpObstacleNode {
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for (frame_id, bump) in hazards_from(&hazards) {
-                if let Err(e) = publish_obstacle_location(&publisher, &bump) {
+                if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
                     eprintln!("Error {e} when trying to publish hazard {frame_id}.");
                 }
             }
         })?;
+        let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[1], move |ir: IrIntensityVector, _| {
-            
+            for sensor in ir.readings {
+                match decode_ir(&sensor) {
+                    Ok(ir) => {
+                        if let Err(e) = publish_str(&publisher, format!("{}", ir.reading_at())) {
+                            eprintln!("Error {e} when trying to publish IR reading.");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Error {e} when trying to parse IR header {}", sensor.header.frame_id);
+                    }
+                }
+            }
         })?;
         Ok(spec)
     }
@@ -85,13 +97,8 @@ pub fn hazards_from(hazards: &HazardDetectionVector) -> impl Iterator<Item = (St
     })
 }
 
-fn publish_obstacle_location(publisher: &Publisher<Ros2String>, bump: &Bump) -> anyhow::Result<()> {
-    let obstacle = bump.obstacle_at();
-    let msg = Ros2String {
-        data: format!("{obstacle}"),
-    };
-    publisher.publish(&msg)?;
-    Ok(())
+pub fn decode_ir(ir: &IrIntensity) -> anyhow::Result<IrReading> {
+    ir.header.frame_id.parse::<IrHeading>().map(|heading| IrReading::new(ir.value, heading))
 }
 
 pub struct ScanObstacleNode {
@@ -110,9 +117,11 @@ impl RunnableNode for ScanObstacleNode {
     fn arg_docs(&self) -> &ArgDocs {
         &self.docs
     }
+
     fn arg_docs_mut(&mut self) -> &mut ArgDocs {
         &mut self.docs
     }
+
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "obstacle_node"), PERIOD)?;
@@ -123,18 +132,7 @@ impl RunnableNode for ScanObstacleNode {
         spec.subscribe(&subs[0], move |scan: LaserScan, _| {
             for (i, &range) in scan.ranges.iter().enumerate() {
                 if range > scan.range_min {
-                    let tag = if range < obstacle_threshold {
-                        "object"
-                    } else {
-                        "freespace"
-                    };
-                    let heading = scan.angle_min + (i as f32 * scan.angle_increment);
-                    let dist = if range < obstacle_threshold {
-                        range
-                    } else {
-                        obstacle_threshold
-                    };
-                    if let Err(e) = publish_scan_obstacle_location(&publisher, tag, dist, heading) {
+                    if let Err(e) = publish_scan_obstacle_location(&publisher, &scan, i, range, obstacle_threshold) {
                         eprintln!("Error {e} when trying to publish scan obstacle");
                     }
                     break;
@@ -143,9 +141,11 @@ impl RunnableNode for ScanObstacleNode {
         })?;
         Ok(spec)
     }
+
     fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         Ok(vec![obstacle_topic_name(robot_name!(args))])
     }
+
     fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = robot_name!(args);
         Ok(vec![format!("{robot}/scan")])
@@ -157,15 +157,23 @@ pub const SCAN_HEADING_NOISE: f64 = 0.005;
 
 fn publish_scan_obstacle_location(
     publisher: &Publisher<Ros2String>,
-    tag: &str,
-    distance: f32,
-    heading: f32,
+    scan: &LaserScan,
+    scan_index: usize,
+    range: f32,
+    obstacle_threshold: f32,
 ) -> anyhow::Result<()> {
-    let msg = Ros2String {
-        data: format!("({tag},{distance},{heading},{SCAN_DISTANCE_NOISE},{SCAN_HEADING_NOISE})"),
+    let tag = if range < obstacle_threshold {
+        "object"
+    } else {
+        "freespace"
     };
-    publisher.publish(&msg)?;
-    Ok(())
+    let heading = scan.angle_min + (scan_index as f32 * scan.angle_increment);
+    let distance = if range < obstacle_threshold {
+        range
+    } else {
+        obstacle_threshold
+    };
+    publish_str(publisher, format!("({tag},{distance},{heading},{SCAN_DISTANCE_NOISE},{SCAN_HEADING_NOISE})"))
 }
 
 pub struct BitSlamNode {
@@ -377,25 +385,21 @@ fn publish_particle(
         particle_data.save()?;
         particle_data.map_saved = true;
     }
-    let data = serde_json::to_string(particle)?;
-    let msg = Ros2String { data };
-    particle_data.particle_publisher.publish(&msg)?;
+
+    publish_str(&particle_data.particle_publisher, serde_json::to_string(particle)?)?;
 
     let grid = particle2rosgrid(node, particle)?;
     particle_data.occupancy_grid_publisher.publish(&grid)?;
 
-    let msg = Ros2String {
-        data: (if failure.is_some() {
+    let msg = (if failure.is_some() {
             "Failed"
         } else if particle_data.map_saved {
             "Finished"
         } else {
             "Mapping"
         })
-        .to_string(),
-    };
-    particle_data.status_publisher.publish(&msg)?;
-    Ok(())
+        .to_string();
+    publish_str(&particle_data.status_publisher, msg)
 }
 
 pub struct BitSlamExplorerNode {
@@ -501,8 +505,7 @@ fn publish_goal_from_particle(
         follow_path(&path, particle, point_publisher, current_target);
     } else {
         eprintln!("There is not a path");
-        let data = "stop".to_string();
-        if let Err(e) = stop_publisher.publish(&Ros2String { data }) {
+        if let Err(e) = publish_str(stop_publisher, "stop".to_string()) {
             eprintln!("Error {e} when trying to publish stop message");
         }
     }

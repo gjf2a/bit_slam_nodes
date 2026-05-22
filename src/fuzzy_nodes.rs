@@ -5,7 +5,7 @@ use crate::{
     fuzzy::{FuzzySet, FuzzyVar},
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name,
-    util::{find_yaw, ros2_node_name, ros2_topic_name, twist_stamped},
+    util::{find_yaw, publish_str, ros2_node_name, ros2_topic_name, twist_stamped},
 };
 use arg_vals::{ArgDocs, ArgVals};
 use crossbeam::atomic::AtomicCell;
@@ -115,9 +115,7 @@ fn publish_odom_fuzzy(
     let odom_point = pt!(odom.pose.pose.position.x, odom.pose.pose.position.y);
     let yaw = find_yaw(&odom);
     let error: FuzzyError = FuzzyError::new(&odom_point, &yaw, &goal);
-    let data = serde_json::to_string(&error)?;
-    publisher.publish(&Ros2String { data })?;
-    Ok(())
+    publish_str(publisher, serde_json::to_string(&error)?)
 }
 
 pub struct DefuzzifyingErrorCorrectingNode {

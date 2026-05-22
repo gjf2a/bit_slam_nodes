@@ -3,13 +3,14 @@ use std::sync::Arc;
 use chrono::Local;
 use particle_filter::{BitGridMap, Particle};
 use particle_filter::{angle::Radians, pose::RobotPose};
+use r2r::Publisher;
 use r2r::geometry_msgs::msg::{Point as Ros2Point, Pose, Quaternion};
 use r2r::nav_msgs::msg::{MapMetaData, OccupancyGrid, Odometry};
 use r2r::{
     Node,
     builtin_interfaces::msg::Time,
     geometry_msgs::msg::{Twist, TwistStamped, Vector3},
-    std_msgs::msg::Header,
+    std_msgs::msg::{Header, String as Ros2String},
 };
 use smol::lock::Mutex;
 
@@ -27,6 +28,12 @@ pub fn ros2_topic_name(robot: &str, concept: &str) -> String {
     } else {
         format!("{robot}/{concept}")
     }
+}
+
+pub fn publish_str(publisher: &Publisher<Ros2String>, s: String) -> anyhow::Result<()> {
+    let msg = Ros2String { data: s };
+    publisher.publish(&msg)?;
+    Ok(())
 }
 
 pub fn timestamped_filename(prefix: &str) -> String {
