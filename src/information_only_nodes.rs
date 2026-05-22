@@ -12,7 +12,7 @@ impl Default for ShowIrNode {
         Self {
             docs: ArgDocs::new(
                 "show_ir_node",
-                &vec![("--robot", "str", "")],
+                &vec![("--robot", "str", ""), ("--show-names", "bool", "false")],
             ),
         }
     }
@@ -40,9 +40,13 @@ impl RunnableNode for ShowIrNode {
         let robot = robot_name!(args);
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "show_ir_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
+        let show_names = args.get_value::<bool>("--show-names")?;
         spec.subscribe(&subs[0], move |ir: IrIntensityVector, _| {
             for value in ir.readings.iter() {
-                print!("{}: {} ", value.header.frame_id, value.value);
+                if show_names {
+                    print!("{}: ", value.header.frame_id);    
+                }
+                print!("{} ", value.value);
             }
             println!();
         })?;
