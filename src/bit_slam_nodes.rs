@@ -55,7 +55,8 @@ impl RunnableNode for BumpObstacleNode {
         let ir_hazard_check = pending_hazard.clone();
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for (_, bump) in hazards_from(&hazards) {
-                pending_hazard.store(Some(bump));
+                eprintln!("Caught bump: {bump:?}");
+                pending_hazard.swap(Some(bump));
             }
         })?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
@@ -65,16 +66,17 @@ impl RunnableNode for BumpObstacleNode {
                 if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
                     eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
                 }
-            }
-            for sensor in ir.readings {
-                match decode_ir(&sensor) {
-                    Ok(ir) => {
-                        if let Err(e) = publish_str(&publisher, format!("{}", ir.reading_at())) {
-                            eprintln!("Error {e} when trying to publish IR reading.");
+            } else {
+                for sensor in ir.readings {
+                    match decode_ir(&sensor) {
+                        Ok(ir) => {
+                            if let Err(e) = publish_str(&publisher, format!("{}", ir.reading_at())) {
+                                eprintln!("Error {e} when trying to publish IR reading.");
+                            }
                         }
-                    }
-                    Err(e) => {
-                        eprintln!("Error {e} when trying to parse IR header {}", sensor.header.frame_id);
+                        Err(e) => {
+                            eprintln!("Error {e} when trying to parse IR header {}", sensor.header.frame_id);
+                        }
                     }
                 }
             }
