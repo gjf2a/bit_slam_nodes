@@ -490,9 +490,9 @@ fn publish_goal_from_particle(
     point_publisher: &Publisher<Ros2Point>,
     stop_publisher: &Publisher<Ros2String>,
 ) {
-    let paths = PathsBackTo::any(particle.map(), particle.estimated_pose());
+    let paths = PathsBackTo::all(particle.map(), particle.estimated_pose());
     let path = paths
-        .shortest_path()
+        .shortest_min_obstacle_path(particle.map())
         .map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
     if let Some(path) = path {
         follow_path(&path, particle, point_publisher);
