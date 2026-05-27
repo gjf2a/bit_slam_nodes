@@ -146,7 +146,7 @@ impl RunnableNode for ScanObstacleNode {
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
-        let obstacle_threshold = 1.0;
+        let obstacle_threshold = 3.0;
         spec.subscribe(&subs[0], move |scan: LaserScan, _| {
             for (i, &range) in scan.ranges.iter().enumerate() {
                 if range > scan.range_min {
