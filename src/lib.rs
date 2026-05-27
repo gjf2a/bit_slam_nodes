@@ -1,9 +1,9 @@
 pub mod bit_slam_nodes;
 pub mod fuzzy;
 pub mod fuzzy_nodes;
+pub mod information_only_nodes;
 pub mod node_struct;
 pub mod unguided_nodes;
-pub mod information_only_nodes;
 pub mod util;
 
 const PERIOD: u64 = 100;

@@ -1,10 +1,15 @@
 use arg_vals::ArgDocs;
 use r2r::irobot_create_msgs::msg::IrIntensityVector;
 
-use crate::{PERIOD, node_struct::{NodeSpec, RunnableNode}, robot_name, util::ros2_node_name};
+use crate::{
+    PERIOD,
+    node_struct::{NodeSpec, RunnableNode},
+    robot_name,
+    util::ros2_node_name,
+};
 
 pub struct ShowIrNode {
-    docs: ArgDocs
+    docs: ArgDocs,
 }
 
 impl Default for ShowIrNode {
@@ -44,7 +49,7 @@ impl RunnableNode for ShowIrNode {
         spec.subscribe(&subs[0], move |ir: IrIntensityVector, _| {
             for value in ir.readings.iter() {
                 if show_names {
-                    print!("{}: ", value.header.frame_id);    
+                    print!("{}: ", value.header.frame_id);
                 }
                 print!("{} ", value.value);
             }

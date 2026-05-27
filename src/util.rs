@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use chrono::Local;
+use particle_filter::angle::Angle;
 use particle_filter::{BitGridMap, Particle};
 use particle_filter::{angle::Radians, pose::RobotPose};
 use r2r::Publisher;
@@ -148,6 +149,22 @@ fn occupancy_grid_vec(map: &BitGridMap) -> Vec<i8> {
             }
         })
         .collect()
+}
+
+pub fn pose2ros2pose(pose: &RobotPose<Radians>) -> Pose {
+    Pose {
+        position: Ros2Point {
+            x: pose.pos[0],
+            y: pose.pos[1],
+            z: 0.0,
+        },
+        orientation: Quaternion {
+            x: 0.0,
+            y: 0.0,
+            z: (pose.theta / 2.0).sin(),
+            w: (pose.theta / 2.0).cos(),
+        },
+    }
 }
 
 #[cfg(test)]
