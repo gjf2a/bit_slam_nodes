@@ -33,7 +33,7 @@ pub struct BumpObstacleNode {
 impl Default for BumpObstacleNode {
     fn default() -> Self {
         Self {
-            docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", "")]),
+            docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", ""), ("--min-obstacle-ir", "i16", "40")]),
         }
     }
 }
@@ -49,6 +49,7 @@ impl RunnableNode for BumpObstacleNode {
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
+        let min_ir_obstacle_present = args.get_value::<i16>("--min-obstacle-ir")?;
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "obstacle_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
@@ -69,7 +70,7 @@ impl RunnableNode for BumpObstacleNode {
                 }
             } else {
                 for sensor in ir.readings {
-                    match decode_ir(&sensor) {
+                    match decode_ir(&sensor, min_ir_obstacle_present) {
                         Ok(ir) => {
                             if let Err(e) = publish_str(&publisher, format!("{}", ir.reading_at()))
                             {
@@ -112,11 +113,11 @@ pub fn hazards_from(hazards: &HazardDetectionVector) -> impl Iterator<Item = (St
     })
 }
 
-pub fn decode_ir(ir: &IrIntensity) -> anyhow::Result<IrReading> {
+pub fn decode_ir(ir: &IrIntensity, min_obstacle_ir_present: i16) -> anyhow::Result<IrReading> {
     ir.header
         .frame_id
         .parse::<IrHeading>()
-        .map(|heading| IrReading::new(ir.value, heading))
+        .map(|heading| IrReading::new(ir.value, heading, min_obstacle_ir_present))
 }
 
 pub struct ScanObstacleNode {
