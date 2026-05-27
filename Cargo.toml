@@ -16,3 +16,4 @@ serde = {version = "1.0.228", features = ["derive"]}
 ringbuffer = "0.16.0"
 arg_vals = {git = "https://github.com/gjf2a/arg_vals"}
 particle_filter = {git = "https://github.com/gjf2a/particle_filter"}
+assert-eq-float = "0.1.5"

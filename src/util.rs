@@ -47,12 +47,11 @@ pub fn find_yaw(value: &Odometry) -> Radians {
 }
 
 pub fn find_roll_pitch_yaw(value: &Odometry) -> (Radians, Radians, Radians) {
-    let (q1, q2, q3, q0) = (
-        value.pose.pose.orientation.x,
-        value.pose.pose.orientation.y,
-        value.pose.pose.orientation.z,
-        value.pose.pose.orientation.w,
-    );
+    quaternion2roll_pitch_yaw(&value.pose.pose.orientation)
+}
+
+fn quaternion2roll_pitch_yaw(q: &Quaternion) -> (Radians, Radians, Radians) {
+    let (q1, q2, q3, q0) = (q.x, q.y, q.z, q.w);
     (
         Radians::new(
             2.0 * (q0 * q1 + q2 * q3)
@@ -60,11 +59,11 @@ pub fn find_roll_pitch_yaw(value: &Odometry) -> (Radians, Radians, Radians) {
         ),
         Radians::new(2.0 * (q0 * q2 - q1 * q3).asin()),
         Radians::new(
-            (q0 * q3 + q1 * q2).atan2(q0.powf(2.0) + q1.powf(2.0) - q2.powf(2.0) - q3.powf(2.0)),
+            (2.0 * (q0 * q3 + q1 * q2)).atan2(q0.powf(2.0) + q1.powf(2.0) - q2.powf(2.0) - q3.powf(2.0)),
         ),
-    )
-}
-
+    ) 
+} 
+ 
 pub fn pose_from_odometry(value: &Odometry) -> RobotPose<Radians> {
     let mut result = RobotPose::default();
     result.pos[0] = value.pose.pose.position.x;
@@ -158,20 +157,24 @@ pub fn pose2ros2pose(pose: &RobotPose<Radians>) -> Pose {
             y: pose.pos[1],
             z: 0.0,
         },
-        orientation: Quaternion {
-            x: 0.0,
-            y: 0.0,
-            z: (pose.theta / 2.0).sin(),
-            w: (pose.theta / 2.0).cos(),
-        },
+        orientation: yaw2quaternion(pose.theta),
+    }
+}
+
+pub fn yaw2quaternion(yaw: Radians) -> Quaternion {
+    Quaternion {
+        x: 0.0,
+        y: 0.0,
+        z: (yaw / 2.0).sin(),
+        w: (yaw / 2.0).cos(),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use particle_filter::{BitGridMap, point::GridPoint};
-
-    use crate::util::occupancy_grid_vec;
+    use particle_filter::{BitGridMap, angle::{Angle, Degrees}, point::GridPoint};
+    use crate::util::{occupancy_grid_vec, quaternion2roll_pitch_yaw, yaw2quaternion};
+    use assert_eq_float::*;
 
     #[test]
     fn test_occupancy_grid() {
@@ -192,6 +195,16 @@ mod tests {
                 };
                 assert_eq!(occupancy_grid[i], expected);
             }
+        }
+    }
+
+    #[test]
+    fn test_yaw_quaternion() {
+        for yaw in 0..360 {
+            let yaw = Degrees::new(yaw as f64).radians();
+            let q = yaw2quaternion(yaw);
+            let back = quaternion2roll_pitch_yaw(&q);
+            assert_eq_float!(f64::from(yaw), f64::from(back.2));
         }
     }
 }
