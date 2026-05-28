@@ -545,7 +545,7 @@ fn follow_path(path: &Vec<GridPoint>, particle: &Particle, point_publisher: &Pub
         let meters = particle.map().to_meters(next_step);
         let target = particle.estimate().convert_to_raw_space(&meters);
         eprintln!("path: {path:?}");
-        eprintln!("target from map: {target} ({meters})");
+        eprintln!("target from map: {target} ({next_step})");
         publish_target(target, point_publisher);
     } else if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
         let target = last_raw_pose + (1.0, last_raw_pose.theta);
