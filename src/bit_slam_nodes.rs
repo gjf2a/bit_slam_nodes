@@ -529,7 +529,11 @@ fn publish_goal_from_particle(
     if let Some(path) = path {
         follow_path(&path, particle, point_publisher);
     } else {
-        eprintln!("There is not a path");
+        if particle.map().is_consistent() {
+            eprintln!("There is not a path but map is consistent");
+        } else {
+            eprintln!("The map is inconsistent");
+        }
         if let Err(e) = publish_str(stop_publisher, "stop".to_string()) {
             eprintln!("Error {e} when trying to publish stop message");
         }
