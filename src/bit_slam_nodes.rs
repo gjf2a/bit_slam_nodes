@@ -524,7 +524,8 @@ fn publish_goal_from_particle(
 ) {
     let paths = PathsBackTo::all(particle.map(), particle.estimated_pose());
     let path = paths
-        .shortest_min_obstacle_path(particle.map())
+        //.shortest_min_obstacle_path(particle.map())
+        .longest_min_obstacle_path(particle.map())
         .map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
     if let Some(path) = path {
         follow_path(&path, particle, point_publisher);
