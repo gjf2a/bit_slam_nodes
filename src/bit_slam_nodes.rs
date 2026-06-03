@@ -10,7 +10,7 @@ use crate::{
 use arg_vals::{ArgDocs, ArgVals};
 use crossbeam::atomic::AtomicCell;
 use particle_filter::{
-    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, angle::Polar, irobot_create3::{Bump, IrHeading, IrReading}, path_plan::{PathsBackTo, necessary_turns_from}, point::{FloatPoint, GridPoint}
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, irobot_create3::{Bump, IrHeading, IrReading}, path_plan::PathsBackTo, point::FloatPoint
 };
 use r2r::{
     Node, Publisher,
