@@ -8,7 +8,6 @@ use crate::{
     },
 };
 use arg_vals::{ArgDocs, ArgVals};
-use crossbeam::atomic::AtomicCell;
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, irobot_create3::{Bump, IrHeading, IrReading}, path_plan::PathsBackTo, point::FloatPoint
 };
@@ -21,7 +20,7 @@ use r2r::{
     std_msgs::msg::String as Ros2String,
 };
 use smol::lock::Mutex;
-use std::sync::Arc;
+use std::{collections::VecDeque, sync::Arc};
 
 pub struct BumpObstacleNode {
     docs: ArgDocs,
@@ -50,22 +49,23 @@ impl RunnableNode for BumpObstacleNode {
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "obstacle_node"), PERIOD)?;
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
-        let pending_hazard: Arc<AtomicCell<Option<Bump>>> = Arc::new(AtomicCell::new(None));
-        let ir_hazard_check = pending_hazard.clone();
+        let pending_hazards = Arc::new(Mutex::new(VecDeque::new()));
+        let ir_hazard_check = pending_hazards.clone();
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for (_, bump) in hazards_from(&hazards) {
                 eprintln!("Caught bump: {bump:?}");
-                pending_hazard.swap(Some(bump));
+                let mut pending_hazards = smol::block_on(pending_hazards.lock());
+                pending_hazards.push_back(bump);
             }
         })?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[1], move |ir: IrIntensityVector, _| {
-            let bump = ir_hazard_check.swap(None);
-            if let Some(bump) = bump {
-                if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
-                    eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
+            if let Some(mut pending_hazards) = ir_hazard_check.try_lock() {
+                while let Some(bump) = pending_hazards.pop_front() {
+                    if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
+                        eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
+                    }
                 }
-            } else {
                 for sensor in ir.readings {
                     match decode_ir(&sensor, min_ir_obstacle_present) {
                         Ok(ir) => {
