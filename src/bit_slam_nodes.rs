@@ -10,10 +10,7 @@ use crate::{
 use arg_vals::{ArgDocs, ArgVals};
 use crossbeam::atomic::AtomicCell;
 use particle_filter::{
-    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType,
-    irobot_create3::{Bump, IrHeading, IrReading},
-    path_plan::{PathsBackTo, necessary_turns_from},
-    point::{FloatPoint, GridPoint},
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, angle::Polar, irobot_create3::{Bump, IrHeading, IrReading}, path_plan::{PathsBackTo, necessary_turns_from}, point::{FloatPoint, GridPoint}
 };
 use r2r::{
     Node, Publisher,
@@ -522,13 +519,10 @@ fn publish_goal_from_particle(
     point_publisher: &Publisher<Ros2Point>,
     stop_publisher: &Publisher<Ros2String>,
 ) {
-    let paths = PathsBackTo::all(particle.map(), particle.estimated_pose());
-    let path = paths
-        //.shortest_min_obstacle_path(particle.map())
-        .longest_min_obstacle_path(particle.map())
-        .map(|p| necessary_turns_from(p.iter().copied(), particle.map()));
-    if let Some(path) = path {
-        follow_path(&path, particle, point_publisher);
+    if let Some(target) = particle.map().exploration_target(particle.estimated_pose()) {
+        let meters = particle.map().to_meters(target);
+        let target = particle.estimate().convert_to_raw_space(&meters);
+        publish_target(target, point_publisher);
     } else {
         if particle.map().is_consistent() {
             eprintln!("There is not a path but map is consistent");
@@ -538,22 +532,6 @@ fn publish_goal_from_particle(
         if let Err(e) = publish_str(stop_publisher, "stop".to_string()) {
             eprintln!("Error {e} when trying to publish stop message");
         }
-    }
-}
-
-fn follow_path(path: &Vec<GridPoint>, particle: &Particle, point_publisher: &Publisher<Ros2Point>) {
-    if let Some(next_step) = path.get(1).copied() {
-        let meters = particle.map().to_meters(next_step);
-        let target = particle.estimate().convert_to_raw_space(&meters);
-        eprintln!("path: {path:?}");
-        eprintln!("target from map: {target} ({next_step})");
-        publish_target(target, point_publisher);
-    } else if let Some(last_raw_pose) = particle.estimate().last_raw_pose() {
-        let target = last_raw_pose + (1.0, last_raw_pose.theta);
-        eprintln!("At edge; target is {target}");
-        publish_target(target, point_publisher);
-    } else {
-        eprintln!("Just starting - no last raw pose");
     }
 }
 

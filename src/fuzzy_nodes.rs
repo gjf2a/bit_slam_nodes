@@ -9,7 +9,7 @@ use crate::{
 };
 use arg_vals::{ArgDocs, ArgVals};
 use crossbeam::atomic::AtomicCell;
-use particle_filter::{angle::Radians, point::FloatPoint, pt};
+use particle_filter::{angle::{Polar, Radians}, point::FloatPoint, pt};
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::{Point as Ros2Point, TwistStamped},
@@ -185,8 +185,8 @@ pub struct FuzzyError {
 impl FuzzyError {
     pub fn new(odom_point: &FloatPoint, yaw: &Radians, goal: &FloatPoint) -> Self {
         let diff = *goal - *odom_point;
-        let (distance, goal_direction): (f64, Radians) = diff.into();
-        let angle_diff = f64::from(goal_direction - *yaw);
+        let goal_polar: Polar = diff.into();
+        let angle_diff = f64::from(goal_polar.theta() - *yaw);
 
         let fuzzifier = FuzzySet::Rising(0.0, ANGLE_LIMIT);
         let (left, right) = if angle_diff > 0.0 {
@@ -194,7 +194,7 @@ impl FuzzyError {
         } else {
             (FuzzyVar::new(0.0), fuzzifier.fuzzify(-angle_diff))
         };
-        let distance = FuzzySet::Rising(0.0, DISTANCE_LIMIT / 2.0).fuzzify(distance);
+        let distance = FuzzySet::Rising(0.0, DISTANCE_LIMIT / 2.0).fuzzify(goal_polar.r());
         Self {
             left,
             right,
