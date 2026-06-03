@@ -53,15 +53,16 @@ impl RunnableNode for BumpObstacleNode {
         let ir_hazard_check = pending_hazards.clone();
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for (_, bump) in hazards_from(&hazards) {
-                eprintln!("Caught bump: {bump:?}");
                 let mut pending_hazards = smol::block_on(pending_hazards.lock());
                 pending_hazards.push_back(bump);
+                eprintln!("Caught bump: {bump:?}; {} pending", pending_hazards.len());
             }
         })?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[1], move |ir: IrIntensityVector, _| {
             if let Some(mut pending_hazards) = ir_hazard_check.try_lock() {
                 while let Some(bump) = pending_hazards.pop_front() {
+                    eprintln!("Publishing {bump:?}; {} pending", pending_hazards.len());
                     if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
                         eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
                     }
