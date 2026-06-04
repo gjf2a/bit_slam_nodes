@@ -29,12 +29,59 @@ pub struct BumpObstacleNode {
 impl Default for BumpObstacleNode {
     fn default() -> Self {
         Self {
-            docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", ""), ("--min-obstacle-ir", "i16", "40")]),
+            docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", "")]),
         }
     }
 }
 
 impl RunnableNode for BumpObstacleNode {
+    fn arg_docs(&self) -> &ArgDocs {
+        &self.docs
+    }
+
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
+    }
+
+    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(&ros2_node_name(robot, "obstacle_node"), PERIOD)?;
+        let subs = self.subscribing_topics(args)?;
+        let pubs = self.publishing_topics(args)?;
+        let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
+        spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
+            for (frame_id, bump) in hazards_from(&hazards) {
+                if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
+                    eprintln!("Error {e} when trying to publish hazard {frame_id}.");
+                }
+            }
+        })?;
+        Ok(spec)
+    }
+
+    fn publishing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        Ok(vec![obstacle_topic_name(robot_name!(args))])
+    }
+
+    fn subscribing_topics(&self, args: &ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = robot_name!(args);
+        Ok(vec![format!("{robot}/hazard_detection")])
+    }
+}
+
+pub struct BumpIrObstacleNode {
+    docs: ArgDocs,
+}
+
+impl Default for BumpIrObstacleNode {
+    fn default() -> Self {
+        Self {
+            docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", ""), ("--min-obstacle-ir", "i16", "40")]),
+        }
+    }
+}
+
+impl RunnableNode for BumpIrObstacleNode {
     fn arg_docs(&self) -> &ArgDocs {
         &self.docs
     }
