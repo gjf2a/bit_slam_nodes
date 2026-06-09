@@ -475,6 +475,7 @@ fn publish_particle(
         header: stamped_header(node)?,
         pose: pose2ros2pose(&particle.particle.estimated_pose()),
     };
+    eprintln!("estimated: {:?} raw: {:?}", particle.particle.estimated_pose(), particle.particle.estimate().last_raw_pose());
     particle_data.pose_publisher.publish(&pose_stamped)?;
 
     let msg = (if particle.particle_type == ParticleType::Failure {
