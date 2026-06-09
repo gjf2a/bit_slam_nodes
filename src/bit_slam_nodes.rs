@@ -9,7 +9,7 @@ use crate::{
 };
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
-    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, irobot_create3::{Bump, IrHeading, IrReading}, path_plan::PathsBackTo, point::FloatPoint
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, SelectionStrategy, irobot_create3::{Bump, IrHeading, IrReading}, path_plan::PathsBackTo, point::FloatPoint
 };
 use r2r::{
     Node, Publisher,
@@ -359,6 +359,7 @@ impl BitSlamSetup {
         settings.num_particles = args.get_value("--num-particles")?;
         settings.square_size_m = args.get_value("--meters-per-cell")?;
         settings.save_inputs = args.get_value("--save-map")?;
+        settings.selection_strategy = SelectionStrategy::Weighted;
         let node_name = ros2_node_name(&robot, "bitslam_node");
         Ok(Self {
             node_name,
