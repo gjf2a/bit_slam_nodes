@@ -205,7 +205,6 @@ impl RunnableNode for ScanObstacleNode {
                     ) {
                         eprintln!("Error {e} when trying to publish scan obstacle");
                     }
-                    break;
                 }
             }
         })?;
