@@ -9,7 +9,11 @@ use crate::{
 };
 use arg_vals::{ArgDocs, ArgVals};
 use crossbeam::atomic::AtomicCell;
-use particle_filter::{angle::{Polar, Radians}, point::FloatPoint, pt};
+use particle_filter::{
+    angle::{Polar, Radians},
+    point::FloatPoint,
+    pt,
+};
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::{Point as Ros2Point, TwistStamped},

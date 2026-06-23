@@ -59,11 +59,12 @@ fn quaternion2roll_pitch_yaw(q: &Quaternion) -> (Radians, Radians, Radians) {
         ),
         Radians::new(2.0 * (q0 * q2 - q1 * q3).asin()),
         Radians::new(
-            (2.0 * (q0 * q3 + q1 * q2)).atan2(q0.powf(2.0) + q1.powf(2.0) - q2.powf(2.0) - q3.powf(2.0)),
+            (2.0 * (q0 * q3 + q1 * q2))
+                .atan2(q0.powf(2.0) + q1.powf(2.0) - q2.powf(2.0) - q3.powf(2.0)),
         ),
-    ) 
-} 
- 
+    )
+}
+
 pub fn pose_from_odometry(value: &Odometry) -> RobotPose<Radians> {
     let mut result = RobotPose::default();
     result.pos[0] = value.pose.pose.position.x;
@@ -178,9 +179,13 @@ pub struct StampedString {
 
 #[cfg(test)]
 mod tests {
-    use particle_filter::{BitGridMap, angle::{Angle, Degrees}, point::GridPoint};
     use crate::util::{occupancy_grid_vec, quaternion2roll_pitch_yaw, yaw2quaternion};
     use assert_eq_float::*;
+    use particle_filter::{
+        BitGridMap,
+        angle::{Angle, Degrees},
+        point::GridPoint,
+    };
 
     #[test]
     fn test_occupancy_grid() {

@@ -3,16 +3,20 @@ use crate::{
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
     util::{
-        particle2rosgrid, pose_from_odometry, pose2ros2pose, publish_str, ros2_node_name,
-        ros2_topic_name, stamped_header, timestamped_filename, StampedString
+        StampedString, particle2rosgrid, pose_from_odometry, pose2ros2pose, publish_str,
+        ros2_node_name, ros2_topic_name, stamped_header, timestamped_filename,
     },
 };
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
-    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, SelectionStrategy, irobot_create3::{Bump, IrHeading, IrReading}, path_plan::PathsBackTo, point::FloatPoint
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, SelectionStrategy,
+    irobot_create3::{Bump, IrHeading, IrReading},
+    path_plan::PathsBackTo,
+    point::FloatPoint,
 };
 use r2r::{
     Node, Publisher,
+    builtin_interfaces::msg::Time,
     geometry_msgs::msg::{Point as Ros2Point, PoseStamped},
     irobot_create_msgs::msg::{HazardDetectionVector, IrIntensity, IrIntensityVector},
     nav_msgs::msg::{OccupancyGrid, Odometry},
@@ -58,7 +62,7 @@ impl RunnableNode for BumpObstacleNode {
                 };
                 if let Err(e) = serde_json::to_string(&stamped_str)
                     .map_err(anyhow::Error::from)
-                    .and_then(|json| publish_str(&publisher, json)) 
+                    .and_then(|json| publish_str(&publisher, json))
                 {
                     eprintln!("Error {e} when trying to publish hazard {frame_id}.");
                 }
@@ -84,7 +88,10 @@ pub struct BumpIrObstacleNode {
 impl Default for BumpIrObstacleNode {
     fn default() -> Self {
         Self {
-            docs: ArgDocs::new("bump_obstacle_node", &vec![("--robot", "str", ""), ("--min-obstacle-ir", "i16", "40")]),
+            docs: ArgDocs::new(
+                "bump_obstacle_node",
+                &vec![("--robot", "str", ""), ("--min-obstacle-ir", "i16", "40")],
+            ),
         }
     }
 }
@@ -98,7 +105,7 @@ impl RunnableNode for BumpIrObstacleNode {
         &mut self.docs
     }
 
-fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let min_ir_obstacle_present = args.get_value::<i16>("--min-obstacle-ir")?;
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "obstacle_node"), PERIOD)?;
@@ -125,7 +132,7 @@ fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
                     };
                     if let Err(e) = serde_json::to_string(&stamped_str)
                         .map_err(anyhow::Error::from)
-                        .and_then(|json| publish_str(&publisher, json)) 
+                        .and_then(|json| publish_str(&publisher, json))
                     {
                         eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
                     }
@@ -140,9 +147,9 @@ fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
                             };
                             if let Err(e) = serde_json::to_string(&stamped_str)
                                 .map_err(anyhow::Error::from)
-                                .and_then(|json| publish_str(&publisher, json)) 
+                                .and_then(|json| publish_str(&publisher, json))
                             {
-                                 eprintln!("Error {e} when trying to publish IR reading.");
+                                eprintln!("Error {e} when trying to publish IR reading.");
                             }
                         }
                         Err(e) => {
@@ -267,7 +274,7 @@ fn publish_scan_obstacle_location(
     };
     let str = format!("({tag},{distance},{heading},{SCAN_DISTANCE_NOISE},{SCAN_HEADING_NOISE})");
     let stamped_str = StampedString {
-        header: scan.header.clone(), 
+        header: scan.header.clone(),
         data: str,
     };
     publish_str(publisher, serde_json::to_string(&stamped_str)?)
@@ -313,6 +320,7 @@ impl RunnableNode for BitSlamNode {
         let status_publisher = spec.publisher::<Ros2String>(&setup.status_topic)?;
         let particle_data = Arc::new(Mutex::new(ParticleData {
             particle_filter,
+            last_sensor_time: None,
             particle_publisher,
             occupancy_grid_publisher,
             pose_publisher,
@@ -347,6 +355,7 @@ impl RunnableNode for BitSlamNode {
 
 struct ParticleData {
     particle_filter: ParticleFilter,
+    last_sensor_time: Option<Time>,
     particle_publisher: Publisher<Ros2String>,
     occupancy_grid_publisher: Publisher<OccupancyGrid>,
     pose_publisher: Publisher<PoseStamped>,
@@ -360,6 +369,14 @@ impl ParticleData {
         let output_filename = timestamped_filename("bit_slam");
         std::fs::write(output_filename, json)?;
         Ok(())
+    }
+
+    fn is_timely(&mut self, time: &Time) -> bool {
+        let mut prev = Some(time.clone());
+        std::mem::swap(&mut prev, &mut self.last_sensor_time);
+        prev.map_or(true, |prev| {
+            prev.sec < time.sec || (prev.sec == time.sec && prev.nanosec < time.nanosec)
+        })
     }
 }
 
@@ -403,7 +420,7 @@ impl BitSlamSetup {
         ParticleFilter::new(self.settings.clone())
     }
 
-fn subscribe_obstacle(
+    fn subscribe_obstacle(
         &self,
         spec: &mut NodeSpec,
         particle_data: Arc<Mutex<ParticleData>>,
@@ -412,9 +429,18 @@ fn subscribe_obstacle(
             let mut particle_data = smol::block_on(particle_data.lock());
             if let Ok(obst) = serde_json::from_str::<StampedString>(&raw_msg.data) {
                 let sim_time = &obst.header.stamp;
-                let ros2_string_wrapper = Ros2String{data: obst.data.clone()};
-                if let Err(e) = publish_particle_obstacle(node, &ros2_string_wrapper, &mut particle_data, sim_time) {
-                    eprintln!("Error {e} when updating particle filter");
+                if particle_data.is_timely(sim_time) {
+                    let ros2_string_wrapper = Ros2String {
+                        data: obst.data.clone(),
+                    };
+                    if let Err(e) = publish_particle_obstacle(
+                        node,
+                        &ros2_string_wrapper,
+                        &mut particle_data,
+                        sim_time,
+                    ) {
+                        eprintln!("Error {e} when updating particle filter");
+                    }
                 }
             } else {
                 eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
@@ -431,8 +457,10 @@ fn subscribe_obstacle(
         spec.subscribe(&self.odom_topic, move |odom: Odometry, node| {
             let mut particle_data = smol::block_on(particle_data.lock());
             let sim_time = &odom.header.stamp;
-            if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time) {
-                eprintln!("Error {e} when updating particle filter with {odom:?}");
+            if particle_data.is_timely(sim_time) {
+                if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time) {
+                    eprintln!("Error {e} when updating particle filter with {odom:?}");
+                }
             }
         })
     }
