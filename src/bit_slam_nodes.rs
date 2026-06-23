@@ -4,7 +4,7 @@ use crate::{
     odom_topic_name, robot_name,
     util::{
         particle2rosgrid, pose_from_odometry, pose2ros2pose, publish_str, ros2_node_name,
-        ros2_topic_name, stamped_header, timestamped_filename,
+        ros2_topic_name, stamped_header, timestamped_filename, StampedString
     },
 };
 use arg_vals::{ArgDocs, ArgVals};
@@ -51,7 +51,15 @@ impl RunnableNode for BumpObstacleNode {
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for (frame_id, bump) in hazards_from(&hazards) {
-                if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
+                let str = format!("{}", bump.obstacle_at());
+                let stamped_str = StampedString {
+                    header: hazards.header.clone(),
+                    data: str,
+                };
+                if let Err(e) = serde_json::to_string(&stamped_str)
+                    .map_err(anyhow::Error::from)
+                    .and_then(|json| publish_str(&publisher, json)) 
+                {
                     eprintln!("Error {e} when trying to publish hazard {frame_id}.");
                 }
             }
@@ -90,7 +98,7 @@ impl RunnableNode for BumpIrObstacleNode {
         &mut self.docs
     }
 
-    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let min_ir_obstacle_present = args.get_value::<i16>("--min-obstacle-ir")?;
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "obstacle_node"), PERIOD)?;
@@ -101,25 +109,40 @@ impl RunnableNode for BumpIrObstacleNode {
         spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, _| {
             for (_, bump) in hazards_from(&hazards) {
                 let mut pending_hazards = smol::block_on(pending_hazards.lock());
-                pending_hazards.push_back(bump);
+                pending_hazards.push_back((hazards.header.clone(), bump));
                 eprintln!("Caught bump: {bump:?}; {} pending", pending_hazards.len());
             }
         })?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[1], move |ir: IrIntensityVector, _| {
             if let Some(mut pending_hazards) = ir_hazard_check.try_lock() {
-                while let Some(bump) = pending_hazards.pop_front() {
+                while let Some((bump_header, bump)) = pending_hazards.pop_front() {
                     eprintln!("Publishing {bump:?}; {} pending", pending_hazards.len());
-                    if let Err(e) = publish_str(&publisher, format!("{}", bump.obstacle_at())) {
+                    let str = format!("{}", bump.obstacle_at());
+                    let stamped_str = StampedString {
+                        header: bump_header,
+                        data: str,
+                    };
+                    if let Err(e) = serde_json::to_string(&stamped_str)
+                        .map_err(anyhow::Error::from)
+                        .and_then(|json| publish_str(&publisher, json)) 
+                    {
                         eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
                     }
                 }
                 for sensor in ir.readings {
                     match decode_ir(&sensor, min_ir_obstacle_present) {
-                        Ok(ir) => {
-                            if let Err(e) = publish_str(&publisher, format!("{}", ir.reading_at()))
+                        Ok(ir_reading) => {
+                            let str = format!("{}", ir_reading.reading_at());
+                            let stamped_str = StampedString {
+                                header: ir.header.clone(),
+                                data: str,
+                            };
+                            if let Err(e) = serde_json::to_string(&stamped_str)
+                                .map_err(anyhow::Error::from)
+                                .and_then(|json| publish_str(&publisher, json)) 
                             {
-                                eprintln!("Error {e} when trying to publish IR reading.");
+                                 eprintln!("Error {e} when trying to publish IR reading.");
                             }
                         }
                         Err(e) => {
@@ -192,7 +215,7 @@ impl RunnableNode for ScanObstacleNode {
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
-        let obstacle_threshold = 10.0;
+        let obstacle_threshold = 30.0;
         spec.subscribe(&subs[0], move |scan: LaserScan, _| {
             for (i, &range) in scan.ranges.iter().enumerate() {
                 if range > scan.range_min {
@@ -242,10 +265,12 @@ fn publish_scan_obstacle_location(
     } else {
         obstacle_threshold
     };
-    publish_str(
-        publisher,
-        format!("({tag},{distance},{heading},{SCAN_DISTANCE_NOISE},{SCAN_HEADING_NOISE})"),
-    )
+    let str = format!("({tag},{distance},{heading},{SCAN_DISTANCE_NOISE},{SCAN_HEADING_NOISE})");
+    let stamped_str = StampedString {
+        header: scan.header.clone(), 
+        data: str,
+    };
+    publish_str(publisher, serde_json::to_string(&stamped_str)?)
 }
 
 pub struct BitSlamNode {
@@ -378,17 +403,24 @@ impl BitSlamSetup {
         ParticleFilter::new(self.settings.clone())
     }
 
-    fn subscribe_obstacle(
+fn subscribe_obstacle(
         &self,
         spec: &mut NodeSpec,
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
-        spec.subscribe(&self.obstacle_topic, move |obst: Ros2String, node| {
+        spec.subscribe(&self.obstacle_topic, move |raw_msg: Ros2String, node| {
             let mut particle_data = smol::block_on(particle_data.lock());
-            if let Err(e) = publish_particle_obstacle(node, &obst, &mut particle_data) {
-                eprintln!("Error {e} when updating particle filter with {}", obst.data);
+            if let Ok(obst) = serde_json::from_str::<StampedString>(&raw_msg.data) {
+                let sim_time = &obst.header.stamp;
+                let ros2_string_wrapper = Ros2String{data: obst.data.clone()};
+                if let Err(e) = publish_particle_obstacle(node, &ros2_string_wrapper, &mut particle_data, sim_time) {
+                    eprintln!("Error {e} when updating particle filter");
+                }
+            } else {
+                eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
             }
-        })
+        })?;
+        Ok(())
     }
 
     fn subscribe_odometry(
@@ -398,7 +430,8 @@ impl BitSlamSetup {
     ) -> anyhow::Result<()> {
         spec.subscribe(&self.odom_topic, move |odom: Odometry, node| {
             let mut particle_data = smol::block_on(particle_data.lock());
-            if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data) {
+            let sim_time = &odom.header.stamp;
+            if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time) {
                 eprintln!("Error {e} when updating particle filter with {odom:?}");
             }
         })
@@ -435,10 +468,11 @@ fn publish_particle_obstacle(
     node: Arc<Mutex<Node>>,
     obst: &Ros2String,
     particle_data: &mut ParticleData,
+    sim_time: &r2r::builtin_interfaces::msg::Time,
 ) -> anyhow::Result<()> {
     let map_input = obst.data.parse::<MapInput>()?;
     particle_data.particle_filter.iterate(map_input);
-    publish_particle(node, particle_data)?;
+    publish_particle(node, particle_data, sim_time)?;
     Ok(())
 }
 
@@ -446,16 +480,18 @@ fn publish_particle_odom(
     node: Arc<Mutex<Node>>,
     odom: &Odometry,
     particle_data: &mut ParticleData,
+    sim_time: &r2r::builtin_interfaces::msg::Time,
 ) -> anyhow::Result<()> {
     let pose = pose_from_odometry(&odom);
     particle_data.particle_filter.iterate(MapInput::Pose(pose));
-    publish_particle(node, particle_data)?;
+    publish_particle(node, particle_data, sim_time)?;
     Ok(())
 }
 
 fn publish_particle(
     node: Arc<Mutex<Node>>,
     particle_data: &mut ParticleData,
+    sim_time: &r2r::builtin_interfaces::msg::Time,
 ) -> anyhow::Result<()> {
     let particle = particle_data.particle_filter.representative_particle();
     if !particle_data.map_saved && PathsBackTo::done(&particle.particle) {
@@ -471,10 +507,11 @@ fn publish_particle(
     let grid = particle2rosgrid(node.clone(), &particle.particle)?;
     particle_data.occupancy_grid_publisher.publish(&grid)?;
 
-    let pose_stamped = PoseStamped {
+    let mut pose_stamped = PoseStamped {
         header: stamped_header(node)?,
         pose: pose2ros2pose(&particle.particle.estimated_pose()),
     };
+    pose_stamped.header.stamp = sim_time.clone();
     //eprintln!("estimated: {:?} raw: {:?}", particle.particle.estimated_pose(), particle.particle.estimate().last_raw_pose());
     particle_data.pose_publisher.publish(&pose_stamped)?;
 

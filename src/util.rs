@@ -170,6 +170,12 @@ pub fn yaw2quaternion(yaw: Radians) -> Quaternion {
     }
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct StampedString {
+    pub header: r2r::std_msgs::msg::Header,
+    pub data: String,
+}
+
 #[cfg(test)]
 mod tests {
     use particle_filter::{BitGridMap, angle::{Angle, Degrees}, point::GridPoint};
