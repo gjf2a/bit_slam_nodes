@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Loaded 1276 stamps and poses from: ground_truth.txt
+Loaded 79 stamps and poses from: slam_toolbox_comparison/poses.txt
+--------------------------------------------------------------------------------
+Synchronizing trajectories...
+Found 75 of max. 79 possible matching timestamps between...
+	ground_truth.txt
+and:	slam_toolbox_comparison/poses.txt
+..with max. time diff.: 0.1 (s) and time offset: 0.0 (s).
+--------------------------------------------------------------------------------
+Aligning using Umeyama's method...
+Rotation of alignment:
+[[ 9.48950919e-01  3.15423505e-01 -4.06927944e-04]
+ [ 3.15423467e-01 -9.48951006e-01 -1.54719929e-04]
+ [-4.34956984e-04  1.84669955e-05 -9.99999905e-01]]
+Translation of alignment:
+[ 9.11452202  1.59213328 -4.63701547]
+Scale correction: 1.0
+--------------------------------------------------------------------------------
+Compared 75 absolute pose pairs.
+Calculating APE for translation part pose relation...
+--------------------------------------------------------------------------------
+APE w.r.t. translation part (m)
+(with SE(3) Umeyama alignment)
+
+       max	3.312899
+      mean	1.302059
+    median	1.451430
+       min	0.105313
+      rmse	1.526855
+       sse	174.846389
+       std	0.797451
+
+--------------------------------------------------------------------------------
+Plotting results... 
+Plot saved to slam_toolbox_comparison/plot_raw.png
+Plot saved to slam_toolbox_comparison/plot_map.png
