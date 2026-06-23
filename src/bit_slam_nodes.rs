@@ -215,7 +215,7 @@ impl RunnableNode for ScanObstacleNode {
         let subs = self.subscribing_topics(args)?;
         let pubs = self.publishing_topics(args)?;
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
-        let obstacle_threshold = 30.0;
+        let obstacle_threshold = 12.0;
         spec.subscribe(&subs[0], move |scan: LaserScan, _| {
             for (i, &range) in scan.ranges.iter().enumerate() {
                 if range > scan.range_min {
@@ -383,7 +383,7 @@ impl BitSlamSetup {
         settings.num_particles = args.get_value("--num-particles")?;
         settings.square_size_m = args.get_value("--meters-per-cell")?;
         settings.save_inputs = args.get_value("--save-map")?;
-        settings.selection_strategy = SelectionStrategy::Weighted;
+        settings.selection_strategy = SelectionStrategy::RankProportion;
         let node_name = ros2_node_name(&robot, "bitslam_node");
         Ok(Self {
             node_name,
