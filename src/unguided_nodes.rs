@@ -2,7 +2,7 @@ use std::{cmp::max, f64::consts::PI, sync::Arc};
 
 use arg_vals::{ArgDocs, ArgVals};
 
-use particle_filter::{MapInput, angle::Radians};
+use particle_filter::{MapInput, angle::{Angle, Radians}};
 use r2r::{
     Node, Publisher,
     geometry_msgs::msg::TwistStamped,
