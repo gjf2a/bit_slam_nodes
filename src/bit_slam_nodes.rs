@@ -467,6 +467,8 @@ impl BitSlamSetup {
                     ) {
                         eprintln!("Error {e} when updating particle filter");
                     }
+                } else {
+                    eprintln!("Dropping out-of-time obstacle message; timestamp {}", sim_time.sec);
                 }
             } else {
                 eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
@@ -487,6 +489,8 @@ impl BitSlamSetup {
                 if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time) {
                     eprintln!("Error {e} when updating particle filter with {odom:?}");
                 }
+            } else {
+                eprintln!("Dropping out-of-time odometry message; timestamp {}", sim_time.sec);
             }
         })
     }
