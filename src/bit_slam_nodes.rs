@@ -10,8 +10,7 @@ use crate::{
 };
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
-    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, SelectionStrategy,
-    irobot_create3::{Bump, IrHeading, IrReading},
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, irobot_create3::{Bump, IrHeading, IrReading},
     path_plan::PathsBackTo,
     point::FloatPoint,
 };
