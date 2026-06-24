@@ -171,6 +171,20 @@ pub fn yaw2quaternion(yaw: Radians) -> Quaternion {
     }
 }
 
+pub fn time_less_than(t1: &Time, t2: &Time) -> bool {
+    t1.sec < t2.sec || (t1.sec == t2.sec && t1.nanosec < t2.nanosec)
+}
+
+pub fn add_time_ns(time: &Time, ns: u32) -> Time {
+    let ns = ns + time.nanosec;
+    let bonus_sec = ns / 1_000_000_000;
+    let remainder = ns % 1_000_000_000;
+    Time {
+        sec: time.sec + bonus_sec as i32,
+        nanosec: remainder,
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct StampedString {
     pub header: r2r::std_msgs::msg::Header,
@@ -179,13 +193,14 @@ pub struct StampedString {
 
 #[cfg(test)]
 mod tests {
-    use crate::util::{occupancy_grid_vec, quaternion2roll_pitch_yaw, yaw2quaternion};
+    use crate::util::{add_time_ns, occupancy_grid_vec, quaternion2roll_pitch_yaw, time_less_than, yaw2quaternion};
     use assert_eq_float::*;
     use particle_filter::{
         BitGridMap,
         angle::{Angle, Degrees},
         point::GridPoint,
     };
+use r2r::builtin_interfaces::msg::Time;
 
     #[test]
     fn test_occupancy_grid() {
@@ -217,5 +232,28 @@ mod tests {
             let back = quaternion2roll_pitch_yaw(&q);
             assert_eq_float!(f64::from(yaw), f64::from(back.2));
         }
+    }
+
+    #[test]
+    fn test_time() {
+        let t1 = Time { sec: 10, nanosec: 20 };
+        let t2 = Time { sec: 10, nanosec: 30 };
+        let t3 = Time { sec: 11, nanosec: 10 };
+        assert!(time_less_than(&t1, &t2));
+        assert!(time_less_than(&t1, &t3));
+        assert!(time_less_than(&t2, &t3));
+        assert!(!time_less_than(&t2, &t1));
+        assert!(!time_less_than(&t3, &t1));
+        assert!(!time_less_than(&t3, &t2));
+
+        let t4 = add_time_ns(&t1, 10);
+        assert_eq!(t2, t4);
+
+        let t5 = add_time_ns(&t1, 1_000_000_000 - 10);
+        assert_eq!(t3, t5);
+
+        let t6 = Time { sec: 14, nanosec: 30};
+        let t7 = add_time_ns(&t1, 4_000_000_010);
+        assert_eq!(t6, t7);
     }
 }

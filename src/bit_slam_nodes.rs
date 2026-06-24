@@ -3,8 +3,9 @@ use crate::{
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
     util::{
-        StampedString, particle2rosgrid, pose_from_odometry, pose2ros2pose, publish_str,
-        ros2_node_name, ros2_topic_name, stamped_header, timestamped_filename,
+        StampedString, add_time_ns, particle2rosgrid, pose_from_odometry, pose2ros2pose,
+        publish_str, ros2_node_name, ros2_topic_name, stamped_header, time_less_than,
+        timestamped_filename,
     },
 };
 use arg_vals::{ArgDocs, ArgVals};
@@ -294,6 +295,8 @@ impl Default for BitSlamNode {
                     ("--num-particles", "usize", "1000"),
                     ("--meters-per-cell", "f64", "0.1"),
                     ("--save-map", "bool", "true"),
+                    ("--weight-strategy", "WeightStrategy", "OdometryGap"),
+                    ("--range-sensor-interval-ms", "Option<u32>", "None"),
                 ],
             ),
         }
@@ -321,6 +324,10 @@ impl RunnableNode for BitSlamNode {
         let particle_data = Arc::new(Mutex::new(ParticleData {
             particle_filter,
             last_sensor_time: None,
+            range_reading_interval_ns: args
+                .get_optional_value::<u32>("--range-sensor-interval-ms")?
+                .map(|ms| {assert!(ms < 4_000); ms * 1_000_000}),
+            next_range_reading: None,
             particle_publisher,
             occupancy_grid_publisher,
             pose_publisher,
@@ -356,6 +363,8 @@ impl RunnableNode for BitSlamNode {
 struct ParticleData {
     particle_filter: ParticleFilter,
     last_sensor_time: Option<Time>,
+    range_reading_interval_ns: Option<u32>,
+    next_range_reading: Option<Time>,
     particle_publisher: Publisher<Ros2String>,
     occupancy_grid_publisher: Publisher<OccupancyGrid>,
     pose_publisher: Publisher<PoseStamped>,
@@ -374,9 +383,25 @@ impl ParticleData {
     fn is_timely(&mut self, time: &Time) -> bool {
         let mut prev = Some(time.clone());
         std::mem::swap(&mut prev, &mut self.last_sensor_time);
-        prev.map_or(true, |prev| {
-            prev.sec < time.sec || (prev.sec == time.sec && prev.nanosec < time.nanosec)
-        })
+        prev.map_or(true, |prev| time_less_than(&prev, time))
+    }
+
+    fn usable_range_reading(&mut self, time: &Time) -> bool {
+        match self.range_reading_interval_ns {
+            None => true,
+            Some(range_reading_interval_ns) => {
+                let mut usable_reading = true;
+                if let Some(next_range_reading) = self.next_range_reading.clone() {
+                    if time_less_than(time, &next_range_reading) {
+                        usable_reading = false;
+                    }
+                }
+                if usable_reading {
+                    self.next_range_reading = Some(add_time_ns(time, range_reading_interval_ns));
+                }
+                usable_reading
+            }
+        }
     }
 }
 
@@ -401,6 +426,7 @@ impl BitSlamSetup {
         settings.square_size_m = args.get_value("--meters-per-cell")?;
         settings.save_inputs = args.get_value("--save-map")?;
         settings.selection_strategy = SelectionStrategy::RankProportion;
+        settings.weight_strategy = args.get_value("--weight-strategy")?;
         let node_name = ros2_node_name(&robot, "bitslam_node");
         Ok(Self {
             node_name,
@@ -499,8 +525,10 @@ fn publish_particle_obstacle(
     sim_time: &r2r::builtin_interfaces::msg::Time,
 ) -> anyhow::Result<()> {
     let map_input = obst.data.parse::<MapInput>()?;
-    particle_data.particle_filter.iterate(map_input);
-    publish_particle(node, particle_data, sim_time)?;
+    if !map_input.is_range_obstacle() || particle_data.usable_range_reading(sim_time) {
+        particle_data.particle_filter.iterate(map_input);
+        publish_particle(node, particle_data, sim_time)?;
+    }
     Ok(())
 }
 
