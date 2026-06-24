@@ -295,7 +295,8 @@ impl Default for BitSlamNode {
                     ("--num-particles", "usize", "1000"),
                     ("--meters-per-cell", "f64", "0.1"),
                     ("--save-map", "bool", "true"),
-                    ("--weight-strategy", "WeightStrategy", "OdometryGap"),
+                    ("--weight-strategy", "WeightStrategy", "MinPose"),
+                    ("--selection-strategy", "SelectionStrategy", "RankProportion"),
                     ("--range-sensor-interval-ms", "Option<u32>", "None"),
                 ],
             ),
@@ -425,7 +426,7 @@ impl BitSlamSetup {
         settings.num_particles = args.get_value("--num-particles")?;
         settings.square_size_m = args.get_value("--meters-per-cell")?;
         settings.save_inputs = args.get_value("--save-map")?;
-        settings.selection_strategy = SelectionStrategy::RankProportion;
+        settings.selection_strategy = args.get_value("--selection-strategy")?;
         settings.weight_strategy = args.get_value("--weight-strategy")?;
         let node_name = ros2_node_name(&robot, "bitslam_node");
         Ok(Self {
