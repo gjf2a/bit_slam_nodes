@@ -52,7 +52,7 @@ def extract_args(values: dict[str,any]):
     for arg in sys.argv[1:]:
         parts = arg.split('=')
         if parts[0] == '--mode':
-            values[parts[0]] = 1 if parts[1] == '--short' else 2
+            values[parts[0]] = 1 if parts[1] == 'short' else 2
         elif parts[0] == '--delay':
             values[parts[0]] = float(parts[1])
         elif parts[0] == '--max-object-distance':
