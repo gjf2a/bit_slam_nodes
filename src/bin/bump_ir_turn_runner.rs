@@ -1,7 +1,7 @@
 use arg_vals::ArgVals;
 use arg_vals::merged_arg_docs;
 use bit_slam_nodes::{
-    bit_slam_nodes::{BitSlamNode, BumpObstacleNode},
+    bit_slam_nodes::{BitSlamNode, BumpIrObstacleNode},
     node_struct::{RunnableNode, run_nodes},
     unguided_nodes::BumpTurnNode,
 };
@@ -9,7 +9,7 @@ use bit_slam_nodes::{
 fn main() -> anyhow::Result<()> {
     let nodes: Vec<Box<dyn RunnableNode>> = vec![
         Box::new(BitSlamNode::default()),
-        Box::new(BumpObstacleNode::default()),
+        Box::new(BumpIrObstacleNode::default()),
         Box::new(BumpTurnNode::default()),
     ];
     let actual_args = ArgVals::env();
