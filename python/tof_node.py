@@ -29,6 +29,7 @@ class TimeOfFlightNode(Node):
         self.tof.start_ranging()
 
     def timer_callback(self):
+        print("In timer")
         if self.tof.check_for_data_ready():
             distance = self.tof.get_distance()
             data_type = None
@@ -36,10 +37,13 @@ class TimeOfFlightNode(Node):
                 if self.max_object_distance is not None:
                     data_type = "freespace"
                     distance = self.max_object_distance
+                    print("freespace; max object distance")
             elif self.max_object_distance is None or distance < self.max_object_distance:
                 data_type = "object"
+                print(f"object; distance is {distance}")
             else:
                 data_type = "freespace"
+                print(f"freespace; distance is {distance}; max is {self.max_object_distance}")
 
             if data_type is not None:
                 output = String()

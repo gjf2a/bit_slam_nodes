@@ -35,8 +35,8 @@ def args(values: dict[str,any]):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) == 1:
-        print("Usage: tof.py [num_readings=100] [mode=(short|long)] [delay=0.1s]")
+    if "--help" in sys.argv:
+        print("Usage: tof.py [--help] [num_readings=100] [mode=(short|long)] [delay=0.1s]")
     else:
         values = {'num_readings': 100, 'mode': 1, 'delay': 0.1}
         args(values)
