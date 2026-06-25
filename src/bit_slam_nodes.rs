@@ -10,7 +10,8 @@ use crate::{
 };
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
-    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType, irobot_create3::{Bump, IrHeading, IrReading},
+    MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType,
+    irobot_create3::{Bump, IrHeading, IrReading},
     path_plan::PathsBackTo,
     point::FloatPoint,
 };
@@ -21,7 +22,7 @@ use r2r::{
     irobot_create_msgs::msg::{HazardDetectionVector, IrIntensity, IrIntensityVector},
     nav_msgs::msg::{OccupancyGrid, Odometry},
     sensor_msgs::msg::LaserScan,
-    std_msgs::msg::String as Ros2String,
+    std_msgs::msg::{Header, String as Ros2String},
 };
 use smol::lock::Mutex;
 use std::{collections::VecDeque, sync::Arc};
@@ -123,43 +124,12 @@ impl RunnableNode for BumpIrObstacleNode {
         let publisher = spec.publisher::<Ros2String>(&pubs[0])?;
         spec.subscribe(&subs[1], move |ir: IrIntensityVector, _| {
             if let Some(mut pending_hazards) = ir_hazard_check.try_lock() {
-                while let Some((bump_header, bump)) = pending_hazards.pop_front() {
-                    eprintln!("Publishing {bump:?}; {} pending", pending_hazards.len());
-                    let str = format!("{}", bump.obstacle_at());
-                    let stamped_str = StampedString {
-                        header: bump_header,
-                        data: str,
-                    };
-                    if let Err(e) = serde_json::to_string(&stamped_str)
-                        .map_err(anyhow::Error::from)
-                        .and_then(|json| publish_str(&publisher, json))
-                    {
-                        eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
-                    }
-                }
-                for sensor in ir.readings {
-                    match decode_ir(&sensor, min_ir_obstacle_present) {
-                        Ok(ir_reading) => {
-                            let str = format!("{}", ir_reading.reading_at());
-                            let stamped_str = StampedString {
-                                header: ir.header.clone(),
-                                data: str,
-                            };
-                            if let Err(e) = serde_json::to_string(&stamped_str)
-                                .map_err(anyhow::Error::from)
-                                .and_then(|json| publish_str(&publisher, json))
-                            {
-                                eprintln!("Error {e} when trying to publish IR reading.");
-                            }
-                        }
-                        Err(e) => {
-                            eprintln!(
-                                "Error {e} when trying to parse IR header {}",
-                                sensor.header.frame_id
-                            );
-                        }
-                    }
-                }
+                Self::handle_ir_intensity(
+                    &mut pending_hazards,
+                    ir,
+                    &publisher,
+                    min_ir_obstacle_present,
+                );
             }
         })?;
         Ok(spec)
@@ -175,6 +145,61 @@ impl RunnableNode for BumpIrObstacleNode {
             format!("{robot}/hazard_detection"),
             format!("{robot}/ir_intensity"),
         ])
+    }
+}
+
+impl BumpIrObstacleNode {
+    fn handle_ir_intensity(
+        pending_hazards: &mut VecDeque<(Header, Bump)>,
+        ir: IrIntensityVector,
+        publisher: &Publisher<Ros2String>,
+        min_ir_obstacle_present: i16,
+    ) {
+        while let Some((bump_header, bump)) = pending_hazards.pop_front() {
+            eprintln!("Publishing {bump:?}; {} pending", pending_hazards.len());
+            let str = format!("{}", bump.obstacle_at());
+            let stamped_str = StampedString {
+                header: bump_header,
+                data: str,
+            };
+            if let Err(e) = serde_json::to_string(&stamped_str)
+                .map_err(anyhow::Error::from)
+                .and_then(|json| publish_str(&publisher, json))
+            {
+                eprintln!("Error {e} when trying to publish {}", bump.obstacle_at());
+            }
+        }
+        Self::process_ir_readings(&ir, min_ir_obstacle_present, &publisher);
+    }
+
+    fn process_ir_readings(
+        ir: &IrIntensityVector,
+        min_ir_obstacle_present: i16,
+        publisher: &Publisher<Ros2String>,
+    ) {
+        for sensor in ir.readings.iter() {
+            match decode_ir(sensor, min_ir_obstacle_present) {
+                Ok(ir_reading) => {
+                    let str = format!("{}", ir_reading.reading_at());
+                    let stamped_str = StampedString {
+                        header: ir.header.clone(),
+                        data: str,
+                    };
+                    if let Err(e) = serde_json::to_string(&stamped_str)
+                        .map_err(anyhow::Error::from)
+                        .and_then(|json| publish_str(&publisher, json))
+                    {
+                        eprintln!("Error {e} when trying to publish IR reading.");
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Error {e} when trying to parse IR header {}",
+                        sensor.header.frame_id
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -295,7 +320,11 @@ impl Default for BitSlamNode {
                     ("--meters-per-cell", "f64", "0.1"),
                     ("--save-map", "bool", "true"),
                     ("--weight-strategy", "WeightStrategy", "MinPose"),
-                    ("--selection-strategy", "SelectionStrategy", "RankProportion"),
+                    (
+                        "--selection-strategy",
+                        "SelectionStrategy",
+                        "RankProportion",
+                    ),
                     ("--range-sensor-interval-ms", "Option<u32>", "None"),
                 ],
             ),
@@ -326,7 +355,10 @@ impl RunnableNode for BitSlamNode {
             last_sensor_time: None,
             range_reading_interval_ns: args
                 .get_optional_value::<u32>("--range-sensor-interval-ms")?
-                .map(|ms| {assert!(ms < 4_000); ms * 1_000_000}),
+                .map(|ms| {
+                    assert!(ms < 4_000);
+                    ms * 1_000_000
+                }),
             next_range_reading: None,
             particle_publisher,
             occupancy_grid_publisher,
@@ -529,7 +561,10 @@ fn publish_particle_obstacle(
         particle_data.particle_filter.iterate(map_input);
         publish_particle(node, particle_data, sim_time)?;
     } else {
-        eprintln!("Ignoring {sim_time:?} range object; awaiting {:?}", particle_data.next_range_reading);
+        eprintln!(
+            "Ignoring {sim_time:?} range object; awaiting {:?}",
+            particle_data.next_range_reading
+        );
     }
     Ok(())
 }
