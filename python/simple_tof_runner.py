@@ -26,9 +26,8 @@ class SimpleTofNode(Node):
 
     def timer_callback(self):
         t = TwistStamped()
-        t.header = Header()
         t.header.frame_id = "base_link"
-        t.header = self.get_clock().now().to_msg()
+        t.header.stamp = self.get_clock().now().to_msg()
 
         if self.timeout_counts_left > 0:
             self.timeout_counts_left -= 1
