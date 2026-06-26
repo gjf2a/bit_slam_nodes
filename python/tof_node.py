@@ -8,7 +8,7 @@ import sys, math
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import Header, String
+from std_msgs.msg import Header
 from sensor_msgs.msg import LaserScan
 from rclpy.executors import MultiThreadedExecutor
 
