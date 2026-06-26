@@ -7,7 +7,6 @@ from sensor_msgs.msg import LaserScan
 from rclpy.executors import MultiThreadedExecutor
 from irobot_create_msgs.msg import HazardDetectionVector
 from geometry_msgs.msg import TwistStamped
-from std_msgs.msg import Header
 
 from tof_node import TimeOfFlightNode, extract_args
 
