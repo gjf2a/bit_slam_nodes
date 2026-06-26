@@ -44,7 +44,7 @@ class SimpleTofNode(Node):
 
     def ir_callback(self, msg: IrIntensityVector):
         for reading in msg.readings:
-            if reading > 40:
+            if reading.value > 40:
                 print("IR hazard")
                 self.found_hazard()
 
