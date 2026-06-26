@@ -7,6 +7,7 @@ from sensor_msgs.msg import LaserScan
 from rclpy.executors import MultiThreadedExecutor
 from irobot_create_msgs.msg import HazardDetectionVector
 from geometry_msgs.msg import TwistStamped
+from std_msgs.msg import Header
 
 from tof_node import TimeOfFlightNode, extract_args
 
@@ -25,6 +26,7 @@ class SimpleTofNode(Node):
 
     def timer_callback(self):
         t = TwistStamped()
+        t.header = Header()
         t.header.frame_id = "base_link"
         t.header = self.get_clock().now().to_msg()
 
