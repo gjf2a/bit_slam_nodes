@@ -8,7 +8,8 @@ import sys, math
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import String
+from std_msgs.msg import Header, String
+from sensor_msgs.msg import LaserScan
 from rclpy.executors import MultiThreadedExecutor
 
 
@@ -18,37 +19,32 @@ class TimeOfFlightNode(Node):
         self.range_noise = range_noise
         self.heading_noise = heading_noise
         self.max_object_distance = max_object_distance
-        tof_topic = f"{robot_name}/bitslam_obstacles"
-        self.pub = self.create_publisher(String, tof_topic, qos_profile_sensor_data)
+        tof_topic = f"{robot_name}/scan"
+        self.pub = self.create_publisher(LaserScan, tof_topic, qos_profile_sensor_data)
         print(f"Publishing on {tof_topic}")
         self.timer = self.create_timer(delay, self.timer_callback)
         self.tof = qwiic_vl53l1x.QwiicVL53L1X()
         self.tof.sensor_init()
         self.tof.set_distance_mode(distance_mode)
+        self.range_max = 1.3 if distance_mode == 1 else 4.0
         self.tof.set_roi(16, 16, 199)
         self.tof.start_ranging()
 
     def timer_callback(self):
-        print("In timer")
         if self.tof.check_for_data_ready():
             distance = self.tof.get_distance()
-            data_type = None
-            if distance == 0:
-                if self.max_object_distance is not None:
-                    data_type = "freespace"
-                    distance = self.max_object_distance
-                    print("freespace; max object distance")
-            elif self.max_object_distance is None or distance < self.max_object_distance:
-                data_type = "object"
-                print(f"object; distance is {distance}")
-            else:
-                data_type = "freespace"
-                print(f"freespace; distance is {distance}; max is {self.max_object_distance}")
-
-            if data_type is not None:
-                output = String()
-                output.data = f"({data_type},{distance/1000},0.0,{self.range_noise},{self.heading_noise})"
-                self.pub.publish(output)
+            output = LaserScan()
+            output.header = Header()
+            output.header.stamp = self.get_clock().now().to_msg()
+            output.header.frame_id = "time_of_flight"
+            output.angle_min = 0.0
+            output.angle_max = 0.0
+            output.angle_increment = 0.0
+            output.scan_time = 0.0
+            output.range_min = 0.1
+            output.range_max = self.range_max
+            output.ranges = [distance / 1000]
+            self.pub.publish(output)
             self.tof.clear_interrupt()
 
 
