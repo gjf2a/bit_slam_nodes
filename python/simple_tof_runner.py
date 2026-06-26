@@ -21,9 +21,11 @@ class SimpleTofNode(Node):
         self.timeout_counts_left = 0
 
     def found_hazard(self):
+        print("Hazard!")
         self.timeout_counts_left = self.bump_timeout_duration
 
     def timer_callback(self):
+        print(f"Counts left: {self.timeout_counts_left}")
         t = TwistStamped()
         t.header.frame_id = "base_link"
         t.header.stamp = self.get_clock().now().to_msg()
