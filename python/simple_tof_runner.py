@@ -14,18 +14,16 @@ class SimpleTofNode(Node):
     def __init__(self, robot_name: str):
         super().__init__(f"{robot_name}_SimpleTof")
         self.create_subscription(LaserScan, f"{robot_name}/scan", self.scan_callback, qos_profile_sensor_data)
-        self.create_subscription(HazardDetectionVector, f"{robot_name}", self.bump_callback, qos_profile_sensor_data)
+        self.create_subscription(HazardDetectionVector, f"{robot_name}/hazard_detection", self.bump_callback, qos_profile_sensor_data)
         self.create_timer(0.1, self.timer_callback)
         self.motors = self.create_publisher(TwistStamped, f"{robot_name}/cmd_vel_stamped", qos_profile_sensor_data)
         self.bump_timeout_duration = 5
         self.timeout_counts_left = 0
 
     def found_hazard(self):
-        print("Hazard!")
         self.timeout_counts_left = self.bump_timeout_duration
 
     def timer_callback(self):
-        print(f"Counts left: {self.timeout_counts_left}")
         t = TwistStamped()
         t.header.frame_id = "base_link"
         t.header.stamp = self.get_clock().now().to_msg()
@@ -39,7 +37,7 @@ class SimpleTofNode(Node):
         self.motors.publish(t)
 
     def scan_callback(self, scan: LaserScan):
-        if scan.ranges[0] < 0.2:
+        if scan.ranges[0] < 0.5:
             self.found_hazard()        
 
     def bump_callback(self, bumps: HazardDetectionVector):
