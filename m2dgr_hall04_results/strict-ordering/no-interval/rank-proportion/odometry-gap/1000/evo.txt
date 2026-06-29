@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Loaded 1276 stamps and poses from: ground_truth.txt
+Loaded 764 stamps and poses from: strict-ordering/no-interval/rank-proportion/odometry-gap/1000/poses.txt
+--------------------------------------------------------------------------------
+Synchronizing trajectories...
+Found 744 of max. 764 possible matching timestamps between...
+	ground_truth.txt
+and:	strict-ordering/no-interval/rank-proportion/odometry-gap/1000/poses.txt
+..with max. time diff.: 0.1 (s) and time offset: 0.0 (s).
+--------------------------------------------------------------------------------
+Aligning using Umeyama's method...
+Rotation of alignment:
+[[ 7.44881205e-01  6.67197061e-01 -2.66798476e-04]
+ [ 6.67196393e-01 -7.44880928e-01 -1.17294468e-03]
+ [-9.81318340e-04  6.95697466e-04 -9.99999277e-01]]
+Translation of alignment:
+[ 9.44458872  1.25847139 -4.63664873]
+Scale correction: 1.0
+--------------------------------------------------------------------------------
+Compared 744 absolute pose pairs.
+Calculating APE for translation part pose relation...
+--------------------------------------------------------------------------------
+APE w.r.t. translation part (m)
+(with SE(3) Umeyama alignment)
+
+       max	8.712733
+      mean	3.197447
+    median	2.978331
+       min	0.024673
+      rmse	3.597644
+       sse	9629.624494
+       std	1.649053
+
+--------------------------------------------------------------------------------
+Plotting results... 
+Plot saved to strict-ordering/no-interval/rank-proportion/odometry-gap/1000/plot_raw.png
+Plot saved to strict-ordering/no-interval/rank-proportion/odometry-gap/1000/plot_map.png

@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Loaded 1276 stamps and poses from: ground_truth.txt
+Loaded 402 stamps and poses from: strict-ordering/500ms-interval/rank-proportion/uniform/1000/poses.txt
+--------------------------------------------------------------------------------
+Synchronizing trajectories...
+Found 389 of max. 402 possible matching timestamps between...
+	ground_truth.txt
+and:	strict-ordering/500ms-interval/rank-proportion/uniform/1000/poses.txt
+..with max. time diff.: 0.1 (s) and time offset: 0.0 (s).
+--------------------------------------------------------------------------------
+Aligning using Umeyama's method...
+Rotation of alignment:
+[[ 1.74687147e-02  9.99847234e-01  5.94192115e-04]
+ [-9.99845353e-01  1.74698811e-02 -2.01804908e-03]
+ [-2.02812126e-03 -5.58847502e-04  9.99997787e-01]]
+Translation of alignment:
+[11.3624558   4.4274799  -4.63449282]
+Scale correction: 1.0
+--------------------------------------------------------------------------------
+Compared 389 absolute pose pairs.
+Calculating APE for translation part pose relation...
+--------------------------------------------------------------------------------
+APE w.r.t. translation part (m)
+(with SE(3) Umeyama alignment)
+
+       max	8.385021
+      mean	3.848921
+    median	3.884813
+       min	0.272556
+      rmse	4.308927
+       sse	7222.504009
+       std	1.937177
+
+--------------------------------------------------------------------------------
+Plotting results... 
+Plot saved to strict-ordering/500ms-interval/rank-proportion/uniform/1000/plot_raw.png
+Plot saved to strict-ordering/500ms-interval/rank-proportion/uniform/1000/plot_map.png
