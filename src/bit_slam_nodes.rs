@@ -90,7 +90,7 @@ impl Default for BumpIrObstacleNode {
     fn default() -> Self {
         Self {
             docs: ArgDocs::new(
-                "bump_obstacle_node",
+                "bump_ir_obstacle_node",
                 &vec![("--robot", "str", ""), ("--min-obstacle-ir", "i16", "40")],
             ),
         }
