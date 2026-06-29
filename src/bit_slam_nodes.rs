@@ -503,6 +503,8 @@ impl BitSlamSetup {
                     ) {
                         eprintln!("Error {e} when updating particle filter");
                     }
+                } else {
+                    eprintln!("Ignored out-of-time update");
                 }
             } else {
                 eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
