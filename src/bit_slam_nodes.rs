@@ -326,6 +326,7 @@ impl Default for BitSlamNode {
                         "RankProportion",
                     ),
                     ("--range-sensor-interval-ms", "Option<u32>", "None"),
+                    ("--ignore-out-of-time", "bool", "false"),
                 ],
             ),
         }
@@ -448,6 +449,7 @@ struct BitSlamSetup {
     save_topic: String,
     settings: ParticleFilterSettings,
     period: u64,
+    ignore_out_of_time: bool,
 }
 
 impl BitSlamSetup {
@@ -470,7 +472,8 @@ impl BitSlamSetup {
             pose_topic: pose_topic_name(&robot),
             save_topic: save_topic_name(&robot),
             settings,
-            period: args.get_value("-spin_time").unwrap_or(PERIOD),
+            period: args.get_value("--spin_time").unwrap_or(PERIOD),
+            ignore_out_of_time: args.get_value("--ignore-out-of-time")?,
         })
     }
 
@@ -483,11 +486,12 @@ impl BitSlamSetup {
         spec: &mut NodeSpec,
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
+        let ignore_out_of_time = self.ignore_out_of_time;
         spec.subscribe(&self.obstacle_topic, move |raw_msg: Ros2String, node| {
             let mut particle_data = smol::block_on(particle_data.lock());
             if let Ok(obst) = serde_json::from_str::<StampedString>(&raw_msg.data) {
                 let sim_time = &obst.header.stamp;
-                if particle_data.is_timely(sim_time) {
+                if !ignore_out_of_time || particle_data.is_timely(sim_time) {
                     let ros2_string_wrapper = Ros2String {
                         data: obst.data.clone(),
                     };
