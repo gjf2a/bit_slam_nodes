@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Loaded 1276 stamps and poses from: ground_truth.txt
+Loaded 520 stamps and poses from: relocate-robot/no-strict-ordering/rank-proportion/odometry-gap/5000/poses_sorted.txt
+--------------------------------------------------------------------------------
+Synchronizing trajectories...
+Found 508 of max. 520 possible matching timestamps between...
+	ground_truth.txt
+and:	relocate-robot/no-strict-ordering/rank-proportion/odometry-gap/5000/poses_sorted.txt
+..with max. time diff.: 0.1 (s) and time offset: 0.0 (s).
+--------------------------------------------------------------------------------
+Aligning using Umeyama's method...
+Rotation of alignment:
+[[ 8.18115302e-01  5.75053870e-01 -6.32184802e-04]
+ [ 5.75054206e-01 -8.18115013e-01  6.96822160e-04]
+ [-1.16489598e-04 -9.33621401e-04 -9.99999557e-01]]
+Translation of alignment:
+[ 8.81728154  1.34006183 -4.63764805]
+Scale correction: 1.0
+--------------------------------------------------------------------------------
+Compared 508 absolute pose pairs.
+Calculating APE for translation part pose relation...
+--------------------------------------------------------------------------------
+APE w.r.t. translation part (m)
+(with SE(3) Umeyama alignment)
+
+       max	6.784329
+      mean	2.601702
+    median	2.231003
+       min	0.207498
+      rmse	2.909961
+       sse	4301.678029
+       std	1.303462
+
+--------------------------------------------------------------------------------
+Plotting results... 
+Plot saved to relocate-robot/no-strict-ordering/rank-proportion/odometry-gap/5000/plot_raw.png
+Plot saved to relocate-robot/no-strict-ordering/rank-proportion/odometry-gap/5000/plot_map.png
