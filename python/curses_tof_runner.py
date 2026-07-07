@@ -14,7 +14,8 @@ def main(stdscr):
     tof_node = TimeOfFlightNode(values['--robot'], values['--max-object-distance'], values['--mode'], values['--delay'])
     simple_tof_node = SimpleTofNode(values['--robot'])
     tof_msg_node = CursesPrintNode(simple_tof_node.topic_name, 10, stdscr)
-    run_curses_nodes(stdscr, [tof_node, simple_tof_node, tof_msg_node])
+    odom_node = CursesPrintNode(f"{values['--robot']}/odom", 8, stdscr)
+    run_curses_nodes(stdscr, [tof_node, simple_tof_node, tof_msg_node, odom_node])
     rclpy.shutdown()
 
 

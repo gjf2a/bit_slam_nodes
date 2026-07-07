@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import random
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
@@ -18,7 +19,7 @@ def ros2_string(s: str) -> String:
 
 
 class SimpleTofNode(Node):
-    def __init__(self, robot_name: str, bump_timeout_duration: int=5, scan_min_m: float=0.5, ir_max: int=40):
+    def __init__(self, robot_name: str, min_bump_timeout: int=5, max_bump_timeout: int=20, scan_min_m: float=0.5, ir_max: int=40):
         super().__init__(f"{robot_name}_SimpleTof")
         self.topic_name = f"{robot_name}_SimpleTof_msg"
         self.create_subscription(LaserScan, f"{robot_name}/scan", self.scan_callback, qos_profile_sensor_data)
@@ -27,14 +28,15 @@ class SimpleTofNode(Node):
         self.msg_pub = self.create_publisher(String, self.topic_name, qos_profile_sensor_data)
         self.create_timer(0.1, self.timer_callback)
         self.motors = self.create_publisher(TwistStamped, f"{robot_name}/cmd_vel_stamped", qos_profile_sensor_data)
-        self.bump_timeout_duration = bump_timeout_duration
+        self.min_bump_timeout = min_bump_timeout
+        self.max_bump_timeout = max_bump_timeout
         self.timeout_counts_left = 0
         self.hazard_counts = {"Scan": 0, "IR": 0, "Bump": 0}
         self.scan_min_m = scan_min_m
         self.ir_max = ir_max
 
     def found_hazard(self, label: str):
-        self.timeout_counts_left = self.bump_timeout_duration
+        self.timeout_counts_left = random.randint(self.min_bump_timeout, self.max_bump_timeout)
         self.hazard_counts[label] += 1
         hazard_str = f"Scan hazards: {self.hazard_counts['Scan']}\nIR hazards: {self.hazard_counts['IR']}\nBump hazards:{self.hazard_counts['Bump']}"
         self.msg_pub.publish(ros2_string(hazard_str))
