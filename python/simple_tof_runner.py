@@ -4,18 +4,27 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import LaserScan
+from std_msgs.msg import String
 from rclpy.executors import MultiThreadedExecutor
 from irobot_create_msgs.msg import HazardDetectionVector, IrIntensityVector
 from geometry_msgs.msg import TwistStamped
 
 from tof_node import TimeOfFlightNode, extract_args
 
+def ros2_string(s: str) -> String:
+    output = String()
+    output.data = s
+    return output
+
+
 class SimpleTofNode(Node):
     def __init__(self, robot_name: str):
         super().__init__(f"{robot_name}_SimpleTof")
+        self.topic_name = f"{robot_name}/SimpleTof_msg"
         self.create_subscription(LaserScan, f"{robot_name}/scan", self.scan_callback, qos_profile_sensor_data)
         self.create_subscription(HazardDetectionVector, f"{robot_name}/hazard_detection", self.bump_callback, qos_profile_sensor_data)
         self.create_subscription(IrIntensityVector, f"{robot_name}/ir_intensity", self.ir_callback, qos_profile_sensor_data)
+        self.msg_pub = self.create_publisher(String, self.topic_name, qos_profile_sensor_data)
         self.create_timer(0.1, self.timer_callback)
         self.motors = self.create_publisher(TwistStamped, f"{robot_name}/cmd_vel_stamped", qos_profile_sensor_data)
         self.bump_timeout_duration = 5
@@ -39,19 +48,19 @@ class SimpleTofNode(Node):
 
     def scan_callback(self, scan: LaserScan):
         if scan.ranges[0] < 0.5:
-            print("Scan hazard")
+            self.msg_pub.publish(ros2_string("Scan hazard"))
             self.found_hazard()        
 
     def ir_callback(self, msg: IrIntensityVector):
         for reading in msg.readings:
             if reading.value > 40:
-                print("IR hazard")
+                self.msg_pub.publish(ros2_string("IR hazard"))
                 self.found_hazard()
 
     def bump_callback(self, bumps: HazardDetectionVector):
         for bump in bumps.detections:
             if 'bump' in bump.header.frame_id:
-                print("Bump hazard")
+                self.msg_pub.publish(ros2_string("Bump hazard"))
                 self.found_hazard()
 
 

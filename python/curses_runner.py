@@ -6,9 +6,9 @@ from rclpy.qos import qos_profile_sensor_data
 from std_msgs.msg import String
 from rclpy.executors import MultiThreadedExecutor
 
-class CursesNode(Node):
+class CursesPrintNode(Node):
     def __init__(self, print_topic: str, first_line: int, stdscr):
-        super().__init__(f"CursesNode_{print_topic}")
+        super().__init__(f"CursesPrintNode_{print_topic}")
         self.create_subscription(String, print_topic, self.callback, qos_profile_sensor_data)
         self.first_line = first_line
         self.stdscr = stdscr

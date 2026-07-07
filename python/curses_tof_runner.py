@@ -1,7 +1,7 @@
 import curses
 import rclpy
 
-from curses_runner import run_curses_nodes
+from curses_runner import run_curses_nodes, CursesPrintNode
 
 from tof_node import TimeOfFlightNode, extract_args
 from simple_tof_runner import SimpleTofNode
@@ -13,7 +13,8 @@ def main(stdscr):
     rclpy.init()
     tof_node = TimeOfFlightNode(values['--robot'], values['--max-object-distance'], values['--mode'], values['--delay'])
     simple_tof_node = SimpleTofNode(values['--robot'])
-    run_curses_nodes(stdscr, [tof_node, simple_tof_node])
+    tof_msg_node = CursesPrintNode(simple_tof_node.topic_name, 10, stdscr)
+    run_curses_nodes(stdscr, [tof_node, simple_tof_node, tof_msg_node])
     rclpy.shutdown()
 
 
