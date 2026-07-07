@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Loaded 1276 stamps and poses from: ground_truth.txt
+Loaded 1821 stamps and poses from: relocate-robot/no-strict-ordering/rank-proportion/uniform/1000/poses_sorted.txt
+--------------------------------------------------------------------------------
+Synchronizing trajectories...
+Found 644 of max. 1276 possible matching timestamps between...
+	ground_truth.txt
+and:	relocate-robot/no-strict-ordering/rank-proportion/uniform/1000/poses_sorted.txt
+..with max. time diff.: 0.1 (s) and time offset: 0.0 (s).
+--------------------------------------------------------------------------------
+Aligning using Umeyama's method...
+Rotation of alignment:
+[[ 5.78704233e-01  8.15537394e-01 -4.10592961e-04]
+ [ 8.15535809e-01 -5.78703986e-01 -1.74365787e-03]
+ [-1.65962998e-03  6.74208930e-04 -9.99998396e-01]]
+Translation of alignment:
+[11.9563858   3.4098179  -4.64038484]
+Scale correction: 1.0
+--------------------------------------------------------------------------------
+Compared 644 absolute pose pairs.
+Calculating APE for translation part pose relation...
+--------------------------------------------------------------------------------
+APE w.r.t. translation part (m)
+(with SE(3) Umeyama alignment)
+
+       max	5.757085
+      mean	3.150778
+    median	2.986739
+       min	0.665242
+      rmse	3.335249
+       sse	7163.781250
+       std	1.093838
+
+--------------------------------------------------------------------------------
+Plotting results... 
+Plot saved to relocate-robot/no-strict-ordering/rank-proportion/uniform/1000/plot_raw.png
+Plot saved to relocate-robot/no-strict-ordering/rank-proportion/uniform/1000/plot_map.png
