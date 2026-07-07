@@ -18,7 +18,7 @@ def ros2_string(s: str) -> String:
 
 
 class SimpleTofNode(Node):
-    def __init__(self, robot_name: str):
+    def __init__(self, robot_name: str, bump_timeout_duration: int=5, scan_min_m: float=0.5, ir_max: int=40):
         super().__init__(f"{robot_name}_SimpleTof")
         self.topic_name = f"{robot_name}_SimpleTof_msg"
         self.create_subscription(LaserScan, f"{robot_name}/scan", self.scan_callback, qos_profile_sensor_data)
@@ -27,11 +27,17 @@ class SimpleTofNode(Node):
         self.msg_pub = self.create_publisher(String, self.topic_name, qos_profile_sensor_data)
         self.create_timer(0.1, self.timer_callback)
         self.motors = self.create_publisher(TwistStamped, f"{robot_name}/cmd_vel_stamped", qos_profile_sensor_data)
-        self.bump_timeout_duration = 5
+        self.bump_timeout_duration = bump_timeout_duration
         self.timeout_counts_left = 0
+        self.hazard_counts = {"Scan": 0, "IR": 0, "Bump": 0}
+        self.scan_min_m = scan_min_m
+        self.ir_max = ir_max
 
-    def found_hazard(self):
+    def found_hazard(self, label: str):
         self.timeout_counts_left = self.bump_timeout_duration
+        self.hazard_counts[label] += 1
+        hazard_str = f"Scan hazards: {self.hazard_counts['Scan']}\nIR hazards: {self.hazard_counts['IR']}\nBump hazards:{self.hazard_counts['Bump']}"
+        self.msg_pub.publish(ros2_string(hazard_str))
 
     def timer_callback(self):
         t = TwistStamped()
@@ -47,21 +53,18 @@ class SimpleTofNode(Node):
         self.motors.publish(t)
 
     def scan_callback(self, scan: LaserScan):
-        if scan.ranges[0] < 0.5:
-            self.msg_pub.publish(ros2_string("Scan hazard"))
-            self.found_hazard()        
+        if scan.ranges[0] < self.scan_min_m:
+            self.found_hazard("Scan")        
 
     def ir_callback(self, msg: IrIntensityVector):
         for reading in msg.readings:
-            if reading.value > 40:
-                self.msg_pub.publish(ros2_string("IR hazard"))
-                self.found_hazard()
+            if reading.value > self.ir_max:
+                self.found_hazard("IR")
 
     def bump_callback(self, bumps: HazardDetectionVector):
         for bump in bumps.detections:
             if 'bump' in bump.header.frame_id:
-                self.msg_pub.publish(ros2_string("Bump hazard"))
-                self.found_hazard()
+                self.found_hazard("Bump")
 
 
 if __name__ == '__main__':
