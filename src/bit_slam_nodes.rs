@@ -488,26 +488,27 @@ impl BitSlamSetup {
     ) -> anyhow::Result<()> {
         let ignore_out_of_time = self.ignore_out_of_time;
         spec.subscribe(&self.obstacle_topic, move |raw_msg: Ros2String, node| {
-            let mut particle_data = smol::block_on(particle_data.lock());
-            if let Ok(obst) = serde_json::from_str::<StampedString>(&raw_msg.data) {
-                let sim_time = &obst.header.stamp;
-                if !ignore_out_of_time || particle_data.is_timely(sim_time) {
-                    let ros2_string_wrapper = Ros2String {
-                        data: obst.data.clone(),
-                    };
-                    if let Err(e) = publish_particle_obstacle(
-                        node,
-                        &ros2_string_wrapper,
-                        &mut particle_data,
-                        sim_time,
-                    ) {
-                        eprintln!("Error {e} when updating particle filter");
+            if let Some(mut particle_data) = particle_data.try_lock() {
+                if let Ok(obst) = serde_json::from_str::<StampedString>(&raw_msg.data) {
+                    let sim_time = &obst.header.stamp;
+                    if !ignore_out_of_time || particle_data.is_timely(sim_time) {
+                        let ros2_string_wrapper = Ros2String {
+                            data: obst.data.clone(),
+                        };
+                        if let Err(e) = publish_particle_obstacle(
+                            node,
+                            &ros2_string_wrapper,
+                            &mut particle_data,
+                            sim_time,
+                        ) {
+                            eprintln!("Error {e} when updating particle filter");
+                        }
+                    } else {
+                        eprintln!("Ignored out-of-time update");
                     }
                 } else {
-                    eprintln!("Ignored out-of-time update");
+                    eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
                 }
-            } else {
-                eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
             }
         })?;
         Ok(())
@@ -519,13 +520,14 @@ impl BitSlamSetup {
         particle_data: Arc<Mutex<ParticleData>>,
     ) -> anyhow::Result<()> {
         spec.subscribe(&self.odom_topic, move |odom: Odometry, node| {
-            let mut particle_data = smol::block_on(particle_data.lock());
-            let sim_time = &odom.header.stamp;
-            if particle_data.is_timely(sim_time) {
-                if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time) {
-                    eprintln!("Error {e} when updating particle filter with {odom:?}");
+            if let Some(mut particle_data) = particle_data.try_lock() {
+                let sim_time = &odom.header.stamp;
+                if particle_data.is_timely(sim_time) {
+                    if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time) {
+                        eprintln!("Error {e} when updating particle filter with {odom:?}");
+                    }
                 }
-            }
+            }           
         })
     }
 
