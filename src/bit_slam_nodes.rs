@@ -523,11 +523,12 @@ impl BitSlamSetup {
             if let Some(mut particle_data) = particle_data.try_lock() {
                 let sim_time = &odom.header.stamp;
                 if particle_data.is_timely(sim_time) {
-                    if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time) {
+                    if let Err(e) = publish_particle_odom(node, &odom, &mut particle_data, sim_time)
+                    {
                         eprintln!("Error {e} when updating particle filter with {odom:?}");
                     }
                 }
-            }           
+            }
         })
     }
 

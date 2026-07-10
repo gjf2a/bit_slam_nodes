@@ -13,15 +13,12 @@ use r2r::{
     nav_msgs::msg::Odometry,
     std_msgs::msg::String as Ros2String,
 };
+use rand::RngExt;
 use ringbuffer::{AllocRingBuffer, RingBuffer};
 use smol::lock::Mutex;
 
 use crate::{
-    PERIOD,
-    bit_slam_nodes::{hazards_from, obstacle_topic_name, stop_topic_name},
-    node_struct::{NodeSpec, RunnableNode},
-    odom_topic_name, robot_name,
-    util::{pose_from_odometry, ros2_node_name, twist_stamped},
+    PERIOD, bit_slam_nodes::{decode_ir, hazards_from, obstacle_topic_name, stop_topic_name}, node_struct::{NodeSpec, RunnableNode}, odom_topic_name, robot_name, util::{StampedString, pose_from_odometry, publish_map_input, publish_str, ros2_node_name, stamped_header, twist_stamped},
 };
 
 pub struct BumpTurnNode {
@@ -119,7 +116,7 @@ impl RunnableNode for BumpTurnNode {
         ])
     }
 
-    fn spec(&self, args: &arg_vals::ArgVals) -> anyhow::Result<crate::node_struct::NodeSpec> {
+    fn spec(&self, args: &arg_vals::ArgVals) -> anyhow::Result<NodeSpec> {
         let robot = args.get_str_value("--robot")?;
         let avoid_distance: f64 = args.get_value("--turn-distance")?;
         let mut spec = NodeSpec::new(&ros2_node_name(robot, "bump_turn_node"), PERIOD)?;
@@ -127,7 +124,7 @@ impl RunnableNode for BumpTurnNode {
         let pubs = self.publishing_topics(args)?;
 
         let status = Arc::new(Mutex::new(BumpTurnStatus::default()));
-        let publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
+        let motor_publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
 
         let obstacle_status = status.clone();
         spec.subscribe(&subs[0], move |obstacle: Ros2String, _| {
@@ -151,7 +148,7 @@ impl RunnableNode for BumpTurnNode {
         spec.subscribe(&subs[1], move |odom: Odometry, node| {
             let pose = pose_from_odometry(&odom);
             if let Some(mut status) = odom_status.try_lock() {
-                if let Err(e) = status.bump_turn_move(pose.theta, node, &publisher) {
+                if let Err(e) = status.bump_turn_move(pose.theta, node, &motor_publisher) {
                     eprintln!("Error {e} from bump_turn_move()");
                 }
             }
@@ -167,6 +164,183 @@ impl RunnableNode for BumpTurnNode {
                 }
             }
         })?;
+        Ok(spec)
+    }
+}
+
+pub struct SimpleBumpIrNode {
+    docs: ArgDocs,
+}
+
+impl Default for SimpleBumpIrNode {
+    fn default() -> Self {
+        Self {
+            docs: ArgDocs::new(
+                "simple_bump_ir_node",
+                &vec![
+                    ("--robot", "str", ""),
+                    ("--max-ir", "i16", "40"),
+                    ("--min-turn-count", "usize", "5"),
+                    ("--max-turn-count", "usize", "20"),
+                ],
+            ),
+        }
+    }
+}
+
+pub struct SimpleBumpIrStatus {
+    min_timeout: usize,
+    max_timeout: usize,
+    timeout_counts_left: usize,
+    max_ir: i16,
+    inputs: Vec<MapInput>,
+    running: bool,
+    publisher: Publisher<Ros2String>,
+}
+
+impl SimpleBumpIrStatus {
+    pub fn new(min_timeout: usize, max_timeout: usize, max_ir: i16, publisher: Publisher<Ros2String>) -> Self {
+        Self {
+            min_timeout,
+            max_timeout,
+            timeout_counts_left: 0,
+            max_ir,
+            inputs: vec![],
+            running: true,
+            publisher,
+        }
+    }
+
+    pub fn handle_bump(&mut self, hazards: HazardDetectionVector, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+        for (_, bump) in hazards_from(&hazards) {
+            self.avoid_obstacle();
+            let map_input = bump.obstacle_at();
+            publish_map_input(&map_input, &self.publisher, node.clone())?;
+            self.inputs.push(map_input);
+        }
+        Ok(())
+    }
+
+    pub fn handle_irs(&mut self, irs: IrIntensityVector, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+        for ir in irs.readings.iter() {
+            let reading = decode_ir(ir, self.max_ir)?;
+            self.avoid_obstacle();
+            let map_input = reading.reading_at();
+            publish_map_input(&map_input, &self.publisher, node.clone())?;
+            self.inputs.push(map_input);
+        }
+        Ok(())
+    }
+
+    pub fn handle_odom(&mut self, odom: &Odometry, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+        let pose = pose_from_odometry(&odom);
+        let map_input = MapInput::Pose(pose);
+        publish_map_input(&map_input, &self.publisher, node.clone())?;
+        self.inputs.push(map_input);
+        Ok(())
+    }
+
+    pub fn get_forward_left(&mut self) -> (f64, f64) {
+        if !self.running {
+            (0.0, 0.0)
+        } else if self.timeout_counts_left > 0 {
+            self.timeout_counts_left -= 1;
+            (0.0, 0.5)
+        } else {
+            (0.5, 0.0)
+        }
+    }
+
+    fn avoid_obstacle(&mut self) {
+        let mut rnd = rand::rng();
+        self.timeout_counts_left = rnd.random_range(self.min_timeout..=self.max_timeout);
+    }
+}
+
+impl RunnableNode for SimpleBumpIrNode {
+    fn arg_docs(&self) -> &ArgDocs {
+        &self.docs
+    }
+
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
+    }
+
+    fn publishing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = robot_name!(args);
+        Ok(vec![format!("{robot}/cmd_vel_stamped"), obstacle_topic_name(robot)])
+    }
+
+    fn subscribing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = robot_name!(args);
+        Ok(vec![
+            format!("{robot}/hazard_detection"),
+            format!("{robot}/ir_intensity"),
+            odom_topic_name(robot),
+            stop_topic_name(robot),
+        ])
+    }
+
+    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(&ros2_node_name(robot, "simple_bump_ir_node"), PERIOD)?;
+        let subs = self.subscribing_topics(args)?;
+        let pubs = self.publishing_topics(args)?;
+
+        let status = Arc::new(Mutex::new(SimpleBumpIrStatus::new(
+            args.get_value("--min-turn-count")?,
+            args.get_value("--max-turn-count")?,
+            args.get_value("--max-ir")?,
+            spec.publisher::<Ros2String>(&pubs[1])?,
+        )));
+
+        let hazard_status = status.clone();
+        spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, node| {
+            let mut status = smol::block_on(hazard_status.lock());
+            if let Err(e) = status.handle_bump(hazards, node.clone()) {
+                eprintln!("Error {e} when handling bump");
+            }
+        })?;
+
+        let ir_status = status.clone();
+        spec.subscribe(&subs[1], move |irs: IrIntensityVector, node| {
+            let mut status = smol::block_on(ir_status.lock());
+            if let Err(e) = status.handle_irs(irs, node.clone()) {
+                eprintln!("Error {e} when handling IR");
+            }
+        })?;
+
+        let odom_status = status.clone();
+        let motor_publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
+        spec.subscribe(&subs[2], move |odom: Odometry, node| {
+            let mut status = smol::block_on(odom_status.lock());
+            if let Err(e) = status.handle_odom(&odom, node.clone()) {
+                eprintln!("Error {e} when handling odometry");
+            }
+            let (forward, leftward_angular) = status.get_forward_left();
+            match twist_stamped(node, forward, leftward_angular) {
+                Ok(twist) => {
+                    if let Err(e) = motor_publisher.publish(&twist) {
+                        eprintln!("Couldn't publish twist: {e}");
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Couldn't build twist: {err}");
+                }
+            }
+        })?;
+
+        spec.subscribe(&subs[3], move |msg: Ros2String, _| {
+            let mut status = smol::block_on(status.lock());
+            match msg.data.as_str() {
+                "stop" => status.running = false,
+                "start" => status.running = true,
+                _ => {
+                    eprintln!("Unknown stop message: {}", msg.data);
+                }
+            }
+        })?;
+
         Ok(spec)
     }
 }

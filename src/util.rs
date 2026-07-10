@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use chrono::Local;
 use particle_filter::angle::Angle;
-use particle_filter::{BitGridMap, Particle};
+use particle_filter::{BitGridMap, MapInput, Particle};
 use particle_filter::{angle::Radians, pose::RobotPose};
 use r2r::Publisher;
 use r2r::geometry_msgs::msg::{Point as Ros2Point, Pose, Quaternion};
@@ -89,12 +89,34 @@ pub fn stamped_header(node: Arc<Mutex<Node>>) -> anyhow::Result<Header> {
     })
 }
 
-pub fn twist_stamped(node: Arc<Mutex<Node>>, x: f64, z: f64) -> anyhow::Result<TwistStamped> {
+pub fn publish_map_input(map_input: &MapInput, publisher: &Publisher<Ros2String>, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+    let stamped_str = StampedString {
+        header: stamped_header(node)?,
+        data: format!("{map_input}"),
+    };
+    serde_json::to_string(&stamped_str)
+        .map_err(anyhow::Error::from)
+        .and_then(|json| publish_str(&publisher, json))
+}
+
+pub fn twist_stamped(
+    node: Arc<Mutex<Node>>,
+    forward: f64,
+    leftward_angular: f64,
+) -> anyhow::Result<TwistStamped> {
     Ok(TwistStamped {
         header: stamped_header(node)?,
         twist: Twist {
-            linear: Vector3 { x, y: 0.0, z: 0.0 },
-            angular: Vector3 { x: 0.0, y: 0.0, z },
+            linear: Vector3 {
+                x: forward,
+                y: 0.0,
+                z: 0.0,
+            },
+            angular: Vector3 {
+                x: 0.0,
+                y: 0.0,
+                z: leftward_angular,
+            },
         },
     })
 }
