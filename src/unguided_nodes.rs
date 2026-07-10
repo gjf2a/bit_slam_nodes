@@ -23,8 +23,8 @@ use crate::{
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
     util::{
-        StampedString, pose_from_odometry, publish_map_input, publish_str, ros2_node_name,
-        stamped_header, twist_stamped,
+        pose_from_odometry, publish_map_input, ros2_node_name,
+        twist_stamped,
     },
 };
 
@@ -244,10 +244,12 @@ impl SimpleBumpIrStatus {
     ) -> anyhow::Result<()> {
         for ir in irs.readings.iter() {
             let reading = decode_ir(ir, self.max_ir)?;
-            self.avoid_obstacle();
             let map_input = reading.reading_at();
-            publish_map_input(&map_input, &self.publisher, node.clone())?;
-            self.inputs.push(map_input);
+            if map_input.obstacle().is_some() {
+                self.avoid_obstacle();
+                publish_map_input(&map_input, &self.publisher, node.clone())?;
+                self.inputs.push(map_input);
+            }         
         }
         Ok(())
     }
