@@ -89,7 +89,11 @@ pub fn stamped_header(node: Arc<Mutex<Node>>) -> anyhow::Result<Header> {
     })
 }
 
-pub fn publish_map_input(map_input: &MapInput, publisher: &Publisher<Ros2String>, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+pub fn publish_map_input(
+    map_input: &MapInput,
+    publisher: &Publisher<Ros2String>,
+    node: Arc<Mutex<Node>>,
+) -> anyhow::Result<()> {
     let stamped_str = StampedString {
         header: stamped_header(node)?,
         data: format!("{map_input}"),

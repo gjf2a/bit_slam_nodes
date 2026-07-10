@@ -18,7 +18,14 @@ use ringbuffer::{AllocRingBuffer, RingBuffer};
 use smol::lock::Mutex;
 
 use crate::{
-    PERIOD, bit_slam_nodes::{decode_ir, hazards_from, obstacle_topic_name, stop_topic_name}, node_struct::{NodeSpec, RunnableNode}, odom_topic_name, robot_name, util::{StampedString, pose_from_odometry, publish_map_input, publish_str, ros2_node_name, stamped_header, twist_stamped},
+    PERIOD,
+    bit_slam_nodes::{decode_ir, hazards_from, obstacle_topic_name, stop_topic_name},
+    node_struct::{NodeSpec, RunnableNode},
+    odom_topic_name, robot_name,
+    util::{
+        StampedString, pose_from_odometry, publish_map_input, publish_str, ros2_node_name,
+        stamped_header, twist_stamped,
+    },
 };
 
 pub struct BumpTurnNode {
@@ -199,7 +206,12 @@ pub struct SimpleBumpIrStatus {
 }
 
 impl SimpleBumpIrStatus {
-    pub fn new(min_timeout: usize, max_timeout: usize, max_ir: i16, publisher: Publisher<Ros2String>) -> Self {
+    pub fn new(
+        min_timeout: usize,
+        max_timeout: usize,
+        max_ir: i16,
+        publisher: Publisher<Ros2String>,
+    ) -> Self {
         Self {
             min_timeout,
             max_timeout,
@@ -211,7 +223,11 @@ impl SimpleBumpIrStatus {
         }
     }
 
-    pub fn handle_bump(&mut self, hazards: HazardDetectionVector, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+    pub fn handle_bump(
+        &mut self,
+        hazards: HazardDetectionVector,
+        node: Arc<Mutex<Node>>,
+    ) -> anyhow::Result<()> {
         for (_, bump) in hazards_from(&hazards) {
             self.avoid_obstacle();
             let map_input = bump.obstacle_at();
@@ -221,7 +237,11 @@ impl SimpleBumpIrStatus {
         Ok(())
     }
 
-    pub fn handle_irs(&mut self, irs: IrIntensityVector, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+    pub fn handle_irs(
+        &mut self,
+        irs: IrIntensityVector,
+        node: Arc<Mutex<Node>>,
+    ) -> anyhow::Result<()> {
         for ir in irs.readings.iter() {
             let reading = decode_ir(ir, self.max_ir)?;
             self.avoid_obstacle();
@@ -268,7 +288,10 @@ impl RunnableNode for SimpleBumpIrNode {
 
     fn publishing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
         let robot = robot_name!(args);
-        Ok(vec![format!("{robot}/cmd_vel_stamped"), obstacle_topic_name(robot)])
+        Ok(vec![
+            format!("{robot}/cmd_vel_stamped"),
+            obstacle_topic_name(robot),
+        ])
     }
 
     fn subscribing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
