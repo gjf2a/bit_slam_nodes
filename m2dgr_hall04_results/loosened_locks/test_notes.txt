@@ -1,0 +1,1 @@
+no strict ordering, rank proportion, odometry gap, 0ms sensor interval

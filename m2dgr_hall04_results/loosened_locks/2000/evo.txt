@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Loaded 1276 stamps and poses from: ground_truth.txt
+Loaded 1402 stamps and poses from: loosened_locks/2000/poses_sorted.txt
+--------------------------------------------------------------------------------
+Synchronizing trajectories...
+Found 509 of max. 1276 possible matching timestamps between...
+	ground_truth.txt
+and:	loosened_locks/2000/poses_sorted.txt
+..with max. time diff.: 0.1 (s) and time offset: 0.0 (s).
+--------------------------------------------------------------------------------
+Aligning using Umeyama's method...
+Rotation of alignment:
+[[ 4.93634702e-01  8.69669251e-01 -4.18830577e-04]
+ [ 8.69667667e-01 -4.93634637e-01 -1.73069741e-03]
+ [-1.71188360e-03  4.90088887e-04 -9.99998415e-01]]
+Translation of alignment:
+[ 9.61660354 -1.04024922 -4.63171827]
+Scale correction: 1.0
+--------------------------------------------------------------------------------
+Compared 509 absolute pose pairs.
+Calculating APE for translation part pose relation...
+--------------------------------------------------------------------------------
+APE w.r.t. translation part (m)
+(with SE(3) Umeyama alignment)
+
+       max	7.669595
+      mean	3.205493
+    median	2.973374
+       min	0.600264
+      rmse	3.480222
+       sse	6164.980218
+       std	1.355271
+
+--------------------------------------------------------------------------------
+Plotting results... 
+Plot saved to loosened_locks/2000/plot_raw.png
+Plot saved to loosened_locks/2000/plot_map.png
