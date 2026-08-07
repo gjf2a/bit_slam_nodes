@@ -343,14 +343,15 @@ impl RunnableNode for BitSlamNode {
     }
 
     fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+        let pubs = self.publishing_topics(args)?;
         let setup = BitSlamSetup::new(args)?;
         let mut spec = NodeSpec::new(&setup.node_name, setup.period)?;
         let particle_filter = setup.create_particle_filter();
-        let particle_publisher = spec.publisher::<Ros2String>(&setup.particle_topic)?;
-        let occupancy_grid_publisher =
-            spec.publisher::<OccupancyGrid>(&setup.occupancy_grid_topic)?;
-        let pose_publisher = spec.publisher::<PoseStamped>(&setup.pose_topic)?;
-        let status_publisher = spec.publisher::<Ros2String>(&setup.status_topic)?;
+        let particle_publisher = spec.publisher::<Ros2String>(&pubs[0])?;
+        let occupancy_grid_publisher = spec.publisher::<OccupancyGrid>(&pubs[1])?;
+        let pose_publisher = spec.publisher::<PoseStamped>(&pubs[2])?;
+        let status_publisher = spec.publisher::<Ros2String>(&pubs[3])?;
+        let on_path_publisher = spec.publisher::<Ros2String>(&pubs[4])?;
         let particle_data = Arc::new(Mutex::new(ParticleData {
             particle_filter,
             last_sensor_time: None,
@@ -365,6 +366,7 @@ impl RunnableNode for BitSlamNode {
             occupancy_grid_publisher,
             pose_publisher,
             status_publisher,
+            on_path_publisher,
             map_saved: false,
         }));
         setup.subscribe_obstacle(&mut spec, particle_data.clone())?;
@@ -380,6 +382,7 @@ impl RunnableNode for BitSlamNode {
             occupancy_grid_topic_name(robot),
             pose_topic_name(robot),
             status_topic_name(robot),
+            on_path_topic_name(robot),
         ])
     }
 
@@ -402,6 +405,7 @@ struct ParticleData {
     occupancy_grid_publisher: Publisher<OccupancyGrid>,
     pose_publisher: Publisher<PoseStamped>,
     status_publisher: Publisher<Ros2String>,
+    on_path_publisher: Publisher<Ros2String>,
     map_saved: bool,
 }
 
@@ -440,12 +444,8 @@ impl ParticleData {
 
 struct BitSlamSetup {
     node_name: String,
-    occupancy_grid_topic: String,
-    particle_topic: String,
     obstacle_topic: String,
-    status_topic: String,
     odom_topic: String,
-    pose_topic: String,
     save_topic: String,
     settings: ParticleFilterSettings,
     period: u64,
@@ -464,12 +464,8 @@ impl BitSlamSetup {
         let node_name = ros2_node_name(&robot, "bitslam_node");
         Ok(Self {
             node_name,
-            occupancy_grid_topic: occupancy_grid_topic_name(&robot),
-            particle_topic: particle_topic_name(&robot),
             obstacle_topic: obstacle_topic_name(&robot),
-            status_topic: status_topic_name(&robot),
             odom_topic: odom_topic_name(&robot),
-            pose_topic: pose_topic_name(&robot),
             save_topic: save_topic_name(&robot),
             settings,
             period: args.get_value("--spin_time").unwrap_or(PERIOD),
@@ -605,6 +601,16 @@ fn publish_particle(
         &particle_data.particle_publisher,
         serde_json::to_string(&particle.particle)?,
     )?;
+
+    let on_path_msg = if PathsBackTo::robot_on_path(
+        particle.particle.map(),
+        particle.particle.estimated_pose(),
+    ) {
+        "on_path"
+    } else {
+        "off_path"
+    };
+    publish_str(&particle_data.on_path_publisher, on_path_msg.to_string())?;
 
     let grid = particle2rosgrid(node.clone(), &particle.particle)?;
     particle_data.occupancy_grid_publisher.publish(&grid)?;
@@ -744,6 +750,10 @@ pub fn particle_topic_name(robot: &str) -> String {
 
 pub fn occupancy_grid_topic_name(robot: &str) -> String {
     ros2_topic_name(robot, "bitslam_occupancy_grid")
+}
+
+pub fn on_path_topic_name(robot: &str) -> String {
+    ros2_topic_name(robot, "bitslam_on_path")
 }
 
 pub fn pose_topic_name(robot: &str) -> String {
