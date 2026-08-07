@@ -319,7 +319,7 @@ impl Default for BitSlamNode {
                     ("--num-particles", "usize", "1000"),
                     ("--meters-per-cell", "f64", "0.1"),
                     ("--save-map", "bool", "true"),
-                    ("--weight-strategy", "WeightStrategy", "MinPose"),
+                    ("--weight-strategy", "WeightStrategy", "OdometryGap"),
                     (
                         "--selection-strategy",
                         "SelectionStrategy",
