@@ -3,7 +3,7 @@ use arg_vals::merged_arg_docs;
 use bit_slam_nodes::{
     bit_slam_nodes::{BitSlamNode, BumpIrObstacleNode},
     node_struct::{RunnableNode, run_nodes},
-    unguided_nodes::BumpTurnNode,
+    bump_avoid_nodes::BumpTurnNode,
 };
 
 fn main() -> anyhow::Result<()> {

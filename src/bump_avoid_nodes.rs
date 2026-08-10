@@ -19,13 +19,12 @@ use smol::lock::Mutex;
 
 use crate::{
     PERIOD,
-    bit_slam_nodes::{decode_ir, hazards_from, obstacle_topic_name, stop_topic_name},
+    bit_slam_nodes::{
+        decode_ir, hazards_from, obstacle_topic_name, on_path_topic_name, stop_topic_name,
+    },
     node_struct::{NodeSpec, RunnableNode},
     odom_topic_name, robot_name,
-    util::{
-        pose_from_odometry, publish_map_input, ros2_node_name,
-        twist_stamped,
-    },
+    util::{pose_from_odometry, publish_map_input, ros2_node_name, twist_stamped},
 };
 
 pub struct BumpTurnNode {
@@ -249,7 +248,7 @@ impl SimpleBumpIrStatus {
                 self.avoid_obstacle();
                 publish_map_input(&map_input, &self.publisher, node.clone())?;
                 self.inputs.push(map_input);
-            }         
+            }
         }
         Ok(())
     }
@@ -363,6 +362,226 @@ impl RunnableNode for SimpleBumpIrNode {
                 _ => {
                     eprintln!("Unknown stop message: {}", msg.data);
                 }
+            }
+        })?;
+
+        Ok(spec)
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
+enum OnPathState {
+    Forward,
+    Turn,
+    Stopped,
+}
+
+impl OnPathState {
+    fn running(&self) -> bool {
+        match self {
+            Self::Stopped => false,
+            _ => true,
+        }
+    }
+
+    fn turning(&self) -> bool {
+        match self {
+            Self::Turn => true,
+            _ => false,
+        }
+    }
+
+    fn twist_stamped(&self, node: Arc<Mutex<Node>>) -> anyhow::Result<TwistStamped> {
+        let (forward, left) = match self {
+            Self::Forward => (0.5, 0.0),
+            Self::Turn => (0.0, 0.5),
+            Self::Stopped => (0.0, 0.0),
+        };
+        twist_stamped(node, forward, left)
+    }
+}
+
+struct OnPathStatus {
+    state: OnPathState,
+    publisher: Publisher<Ros2String>,
+    max_ir: i16,
+    inputs: Vec<MapInput>,
+}
+
+impl OnPathStatus {
+    fn new(max_ir: i16, publisher: Publisher<Ros2String>) -> Self {
+        Self {
+            state: OnPathState::Forward,
+            publisher,
+            max_ir,
+            inputs: vec![],
+        }
+    }
+
+    fn handle_hazards(
+        &mut self,
+        node: Arc<Mutex<Node>>,
+        hazards: &HazardDetectionVector,
+    ) -> anyhow::Result<()> {
+        if self.state.running() {
+            for (_, bump) in hazards_from(&hazards) {
+                self.state = OnPathState::Turn;
+                let map_input = bump.obstacle_at();
+                publish_map_input(&map_input, &self.publisher, node.clone())?;
+                self.inputs.push(map_input);
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_irs(
+        &mut self,
+        node: Arc<Mutex<Node>>,
+        irs: &IrIntensityVector,
+    ) -> anyhow::Result<()> {
+        if self.state.running() {
+            for ir in irs.readings.iter() {
+                let reading = decode_ir(ir, self.max_ir)?;
+                let map_input = reading.reading_at();
+                if map_input.obstacle().is_some() {
+                    self.state = OnPathState::Turn;
+                    publish_map_input(&map_input, &self.publisher, node.clone())?;
+                }
+                self.inputs.push(map_input);
+            }
+        }
+        Ok(())
+    }
+
+    pub fn handle_odom(&mut self, odom: &Odometry, node: Arc<Mutex<Node>>) -> anyhow::Result<()> {
+        if self.state.running() {
+            let pose = pose_from_odometry(&odom);
+            let map_input = MapInput::Pose(pose);
+            publish_map_input(&map_input, &self.publisher, node.clone())?;
+            self.inputs.push(map_input);
+        }
+        Ok(())
+    }
+
+    pub fn handle_on_path(&mut self, msg: &str) {
+        if self.state.turning() {
+            match msg {
+                "on_path" => self.state = OnPathState::Forward,
+                "off_path" => {}
+                _ => {
+                    eprintln!("Unrecognized on-path message: {msg}")
+                }
+            }
+        }
+    }
+}
+
+pub struct OnPathBumpIrNode {
+    docs: ArgDocs,
+}
+
+impl Default for OnPathBumpIrNode {
+    fn default() -> Self {
+        Self {
+            docs: ArgDocs::new(
+                "on_path_bump_ir_node",
+                &vec![("--robot", "str", ""), ("--max-ir", "i16", "40")],
+            ),
+        }
+    }
+}
+
+impl RunnableNode for OnPathBumpIrNode {
+    fn arg_docs(&self) -> &ArgDocs {
+        &self.docs
+    }
+
+    fn arg_docs_mut(&mut self) -> &mut ArgDocs {
+        &mut self.docs
+    }
+
+    fn publishing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = robot_name!(args);
+        Ok(vec![
+            format!("{robot}/cmd_vel_stamped"),
+            obstacle_topic_name(robot),
+        ])
+    }
+
+    fn subscribing_topics(&self, args: &arg_vals::ArgVals) -> anyhow::Result<Vec<String>> {
+        let robot = robot_name!(args);
+        Ok(vec![
+            format!("{robot}/hazard_detection"),
+            format!("{robot}/ir_intensity"),
+            odom_topic_name(robot),
+            stop_topic_name(robot),
+            on_path_topic_name(robot),
+        ])
+    }
+
+    fn spec(&self, args: &ArgVals) -> anyhow::Result<NodeSpec> {
+        let robot = args.get_str_value("--robot")?;
+        let mut spec = NodeSpec::new(&ros2_node_name(robot, "on_path_bump_ir_node"), PERIOD)?;
+        let subs = self.subscribing_topics(args)?;
+        let pubs = self.publishing_topics(args)?;
+        let status = Arc::new(Mutex::new(OnPathStatus::new(
+            args.get_value("--max-ir")?,
+            spec.publisher::<Ros2String>(&pubs[1])?,
+        )));
+
+        let hazard_status = status.clone();
+        spec.subscribe(&subs[0], move |hazards: HazardDetectionVector, node| {
+            if let Some(mut status) = hazard_status.try_lock() {
+                if let Err(e) = status.handle_hazards(node, &hazards) {
+                    eprintln!("Error handling hazards: {e}");
+                }
+            }
+        })?;
+
+        let ir_status = status.clone();
+        spec.subscribe(&subs[1], move |irs: IrIntensityVector, node| {
+            if let Some(mut status) = ir_status.try_lock() {
+                if let Err(e) = status.handle_irs(node, &irs) {
+                    eprintln!("Error handling IRs: {e}");
+                }
+            }
+        })?;
+
+        let odom_status = status.clone();
+        let motor_publisher = spec.publisher::<TwistStamped>(&pubs[0])?;
+        spec.subscribe(&subs[2], move |odom: Odometry, node| {
+            if let Some(mut status) = odom_status.try_lock() {
+                if let Err(e) = status.handle_odom(&odom, node.clone()) {
+                    eprintln!("Error {e} when handling odometry");
+                }
+                match status.state.twist_stamped(node) {
+                    Ok(twist) => {
+                        if let Err(e) = motor_publisher.publish(&twist) {
+                            eprintln!("Couldn't publish twist: {e}");
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Couldn't build twist: {e}")
+                    }
+                }
+            }
+        })?;
+
+        let stop_status = status.clone();
+        spec.subscribe(&subs[3], move |msg: Ros2String, _| {
+            let mut status = smol::block_on(stop_status.lock());
+            match msg.data.as_str() {
+                "stop" => status.state = OnPathState::Stopped,
+                "start" => status.state = OnPathState::Forward,
+                _ => {
+                    eprintln!("Unknown stop message: {}", msg.data);
+                }
+            }
+        })?;
+
+        spec.subscribe(&subs[4], move |msg: Ros2String, _| {
+            if let Some(mut status) = status.try_lock() {
+                status.handle_on_path(&msg.data);
             }
         })?;
 
