@@ -1,0 +1,37 @@
+--------------------------------------------------------------------------------
+Loaded 1276 stamps and poses from: ground_truth.txt
+Loaded 635 stamps and poses from: raw_odometry/poses.txt
+--------------------------------------------------------------------------------
+Synchronizing trajectories...
+Found 619 of max. 635 possible matching timestamps between...
+	ground_truth.txt
+and:	raw_odometry/poses.txt
+..with max. time diff.: 0.1 (s) and time offset: 0.0 (s).
+--------------------------------------------------------------------------------
+Aligning using Umeyama's method...
+Rotation of alignment:
+[[ 5.18915668e-01  8.54825375e-01 -3.27058802e-04]
+ [ 8.54824649e-01 -5.18915671e-01 -1.16029347e-03]
+ [-1.16156424e-03  3.22516535e-04 -9.99999273e-01]]
+Translation of alignment:
+[10.07661828 -0.65479176 -4.63447024]
+Scale correction: 1.0
+--------------------------------------------------------------------------------
+Compared 619 absolute pose pairs.
+Calculating APE for translation part pose relation...
+--------------------------------------------------------------------------------
+APE w.r.t. translation part (m)
+(with SE(3) Umeyama alignment)
+
+       max	5.714649
+      mean	3.181690
+    median	3.125070
+       min	0.591642
+      rmse	3.376096
+       sse	7055.378250
+       std	1.129104
+
+--------------------------------------------------------------------------------
+Plotting results... 
+Plot saved to raw_odometry/plot_raw.png
+Plot saved to raw_odometry/plot_map.png
