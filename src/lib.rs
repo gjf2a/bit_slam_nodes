@@ -5,6 +5,7 @@ pub mod information_only_nodes;
 pub mod node_struct;
 pub mod bump_avoid_nodes;
 pub mod util;
+pub mod stream_idea;
 
 const PERIOD: u64 = 100;
 
