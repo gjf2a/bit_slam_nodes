@@ -602,10 +602,7 @@ fn publish_particle(
         serde_json::to_string(&particle.particle)?,
     )?;
 
-    let on_path_msg = if PathsBackTo::robot_on_path(
-        particle.particle.map(),
-        particle.particle.estimated_pose(),
-    ) {
+    let on_path_msg = if particle.particle.unvisited_on_straight_path().is_some() {
         "on_path"
     } else {
         "off_path"
