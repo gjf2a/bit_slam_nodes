@@ -486,26 +486,30 @@ impl BitSlamSetup {
         let ignore_out_of_time = self.ignore_out_of_time;
         spec.subscribe(&self.obstacle_topic, move |raw_msg: Ros2String, node| {
             if let Some(mut particle_data) = particle_data.try_lock() {
-                if let Ok(obst) = serde_json::from_str::<StampedString>(&raw_msg.data) {
-                    let sim_time = &obst.header.stamp;
-                    if !ignore_out_of_time || particle_data.is_timely(sim_time) {
-                        let ros2_string_wrapper = Ros2String {
-                            data: obst.data.clone(),
-                        };
-                        if let Err(e) = publish_particle_obstacle(
-                            node,
-                            &ros2_string_wrapper,
-                            &mut particle_data,
-                            sim_time,
-                        ) {
-                            eprintln!("Error {e} when updating particle filter");
+                match serde_json::from_str::<StampedString>(&raw_msg.data) {
+                    Ok(obst) => {
+                        let sim_time = &obst.header.stamp;
+                        if !ignore_out_of_time || particle_data.is_timely(sim_time) {
+                            let ros2_string_wrapper = Ros2String {
+                                data: obst.data.clone(),
+                            };
+                            if let Err(e) = publish_particle_obstacle(
+                                node,
+                                &ros2_string_wrapper,
+                                &mut particle_data,
+                                sim_time,
+                            ) {
+                                eprintln!("Error {e} when updating particle filter");
+                            }
+                        } else {
+                            eprintln!("Ignored out-of-time update");
                         }
-                    } else {
-                        eprintln!("Ignored out-of-time update");
                     }
-                } else {
-                    eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
-                    eprintln!("JSON:\n{}", &raw_msg.data);
+                    Err(e) => {
+                        eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
+                        eprintln!("{e}");
+                        eprintln!("JSON:\n{}", &raw_msg.data);
+                    }
                 }
             }
         })?;
