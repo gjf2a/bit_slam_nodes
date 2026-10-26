@@ -2,8 +2,8 @@ use arg_vals::ArgVals;
 use arg_vals::merged_arg_docs;
 use bit_slam_nodes::{
     bit_slam_nodes::{BitSlamNode, BumpIrObstacleNode},
-    node_struct::{RunnableNode, run_nodes},
     bump_avoid_nodes::BumpTurnNode,
+    node_struct::{RunnableNode, run_nodes},
 };
 
 fn main() -> anyhow::Result<()> {

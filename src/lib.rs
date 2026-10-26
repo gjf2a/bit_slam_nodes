@@ -1,11 +1,11 @@
 pub mod bit_slam_nodes;
+pub mod bump_avoid_nodes;
 pub mod fuzzy;
 pub mod fuzzy_nodes;
 pub mod information_only_nodes;
 pub mod node_struct;
-pub mod bump_avoid_nodes;
-pub mod util;
 pub mod stream_idea;
+pub mod util;
 
 const PERIOD: u64 = 100;
 

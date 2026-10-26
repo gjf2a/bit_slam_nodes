@@ -11,6 +11,7 @@ use crate::{
 use arg_vals::{ArgDocs, ArgVals};
 use particle_filter::{
     MapInput, Particle, ParticleFilter, ParticleFilterSettings, ParticleType,
+    StraightPathDestination,
     irobot_create3::{Bump, IrHeading, IrReading},
     path_plan::PathsBackTo,
     point::FloatPoint,
@@ -602,10 +603,12 @@ fn publish_particle(
         serde_json::to_string(&particle.particle)?,
     )?;
 
-    let on_path_msg = if particle.particle.unvisited_on_straight_path().is_some() {
-        "on_path"
-    } else {
-        "off_path"
+    let on_path_msg = match particle.particle.straight_path_destination() {
+        Some(spd) => match spd {
+            StraightPathDestination::Obstacle(_, distance) => format!("obstacle: {distance} meters"),
+            StraightPathDestination::Unvisited(_, distance) => format!("on_path: {distance} meters"),
+        },
+        None => "path_bug".to_string(),
     };
     publish_str(&particle_data.on_path_publisher, on_path_msg.to_string())?;
 

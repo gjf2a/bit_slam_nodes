@@ -1,17 +1,41 @@
 use futures::{Stream, StreamExt, future::Fuse};
-use r2r::{Context, Node, QosProfile, WrappedTypesupport, irobot_create_msgs::msg::{HazardDetectionVector, IrIntensityVector}, nav_msgs::msg::Odometry, std_msgs::msg::String as Ros2String};
+use r2r::{
+    Context, Node, QosProfile, WrappedTypesupport,
+    irobot_create_msgs::msg::{HazardDetectionVector, IrIntensityVector},
+    nav_msgs::msg::Odometry,
+    std_msgs::msg::String as Ros2String,
+};
 
-use crate::{bit_slam_nodes::{on_path_topic_name, stop_topic_name}, odom_topic_name};
+use crate::{
+    bit_slam_nodes::{on_path_topic_name, stop_topic_name},
+    odom_topic_name,
+};
 
 // First compiling version
 pub fn test1(robot: &str) -> anyhow::Result<()> {
     let context = Context::create()?;
     let mut node = Node::create(context, "test_node", robot)?;
-    let mut sub_hazard = node.subscribe::<HazardDetectionVector>(&format!("{robot}/hazard_detection"), QosProfile::sensor_data())?.fuse();
-    let mut sub_ir = node.subscribe::<IrIntensityVector>(&format!("{robot}/ir_intensity"), QosProfile::sensor_data())?.fuse();
-    let mut sub_odom = node.subscribe::<Odometry>(&odom_topic_name(robot), QosProfile::sensor_data())?.fuse();
-    let mut sub_stop = node.subscribe::<Ros2String>(&stop_topic_name(robot), QosProfile::sensor_data())?.fuse();
-    let mut sub_on_path = node.subscribe::<Ros2String>(&on_path_topic_name(robot), QosProfile::sensor_data())?.fuse();
+    let mut sub_hazard = node
+        .subscribe::<HazardDetectionVector>(
+            &format!("{robot}/hazard_detection"),
+            QosProfile::sensor_data(),
+        )?
+        .fuse();
+    let mut sub_ir = node
+        .subscribe::<IrIntensityVector>(
+            &format!("{robot}/ir_intensity"),
+            QosProfile::sensor_data(),
+        )?
+        .fuse();
+    let mut sub_odom = node
+        .subscribe::<Odometry>(&odom_topic_name(robot), QosProfile::sensor_data())?
+        .fuse();
+    let mut sub_stop = node
+        .subscribe::<Ros2String>(&stop_topic_name(robot), QosProfile::sensor_data())?
+        .fuse();
+    let mut sub_on_path = node
+        .subscribe::<Ros2String>(&on_path_topic_name(robot), QosProfile::sensor_data())?
+        .fuse();
     smol::block_on(async {
         loop {
             futures::select! {
@@ -24,11 +48,11 @@ pub fn test1(robot: &str) -> anyhow::Result<()> {
             }
         }
     });
-    
+
     Ok(())
 }
 
-/* 
+/*
 // I am preserving this attempt so I remember why I had to define a macro.
 // In the run() method, it flags that self has been mutably borrowed more than once.
 
@@ -40,7 +64,7 @@ pub struct TestNode {
 impl TestNode {
     pub fn new(robot: &str) -> anyhow::Result<Self> {
         let context = Context::create()?;
-        Ok(Self {node: Node::create(context, "test_node", robot)?, robot: robot.to_string()})    
+        Ok(Self {node: Node::create(context, "test_node", robot)?, robot: robot.to_string()})
     }
 
     pub fn topic(&self, topic: &str) -> String {
@@ -65,14 +89,20 @@ impl TestNode {
 // Second compiling version
 macro_rules! subscribe {
     ($node:expr, $sub_type:ty, $topic:expr) => {
-        $node.subscribe::<$sub_type>($topic, QosProfile::sensor_data())?.fuse()
+        $node
+            .subscribe::<$sub_type>($topic, QosProfile::sensor_data())?
+            .fuse()
     };
 }
 
 pub fn test2(robot: &str) -> anyhow::Result<()> {
     let context = Context::create()?;
     let mut node = Node::create(context, "test_node", robot)?;
-    let mut sub_hazard = subscribe!(node, HazardDetectionVector, &format!("{robot}/hazard_detection"));
+    let mut sub_hazard = subscribe!(
+        node,
+        HazardDetectionVector,
+        &format!("{robot}/hazard_detection")
+    );
     let mut sub_ir = subscribe!(node, IrIntensityVector, &format!("{robot}/ir_intensity"));
     let mut sub_odom = subscribe!(node, Odometry, &odom_topic_name(robot));
     let mut sub_stop = subscribe!(node, Ros2String, &stop_topic_name(robot));
@@ -89,7 +119,7 @@ pub fn test2(robot: &str) -> anyhow::Result<()> {
             }
         }
     });
-    
+
     Ok(())
 }
 
@@ -108,7 +138,11 @@ pub struct AllMessages {
 pub fn test3(robot: &str) -> anyhow::Result<()> {
     let context = Context::create()?;
     let mut node = Node::create(context, "test_node", robot)?;
-    let mut sub_hazard = subscribe!(node, HazardDetectionVector, &format!("{robot}/hazard_detection"));
+    let mut sub_hazard = subscribe!(
+        node,
+        HazardDetectionVector,
+        &format!("{robot}/hazard_detection")
+    );
     let mut sub_ir = subscribe!(node, IrIntensityVector, &format!("{robot}/ir_intensity"));
     let mut sub_odom = subscribe!(node, Odometry, &odom_topic_name(robot));
     let mut sub_stop = subscribe!(node, Ros2String, &stop_topic_name(robot));
@@ -126,10 +160,9 @@ pub fn test3(robot: &str) -> anyhow::Result<()> {
             }
         }
     });
-    
+
     Ok(())
 }
-
 
 // Vision for where I ideally would like to go
 //
