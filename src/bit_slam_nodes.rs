@@ -505,6 +505,7 @@ impl BitSlamSetup {
                     }
                 } else {
                     eprintln!("Error: Received corrupted or invalid JSON on obstacle topic!");
+                    eprintln!("JSON:\n{}", &raw_msg.data);
                 }
             }
         })?;
