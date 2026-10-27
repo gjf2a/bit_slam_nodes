@@ -4,6 +4,7 @@ use particle_filter::{
     pose::RobotPose,
     pt,
 };
+use bit_slam_nodes::util::StampedString;
 use serde_json;
 
 fn main() {
@@ -13,4 +14,9 @@ fn main() {
     println!("{}", serde_json::to_string(&src).unwrap());
     let regen = serde_json::from_str::<MapInput>(test).unwrap();
     println!("{regen:?}");
+
+    println!();
+    let test2 = r#"{"header": {"stamp": {"sec": 57836, "nanosec": 917077120}, "frame_id": "odom"}, "data": {"Pose": {"pos": {"coords": [1.223861813545227, 0.03784951940178871]}, "theta": -0.009354704342699804}}}"#;
+    let regen2 = serde_json::from_str::<StampedString>(test2).unwrap();
+    println!("regen2: {regen2:?}");
 }
