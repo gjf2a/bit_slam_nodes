@@ -1,10 +1,10 @@
+use bit_slam_nodes::util::StampedString;
 use particle_filter::{
     MapInput,
     angle::Radians,
     pose::RobotPose,
     pt,
 };
-use bit_slam_nodes::util::StampedString;
 use serde_json;
 
 fn main() {
